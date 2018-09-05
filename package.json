@@ -1,0 +1,14 @@
+{
+  "name": "s3_sync",
+  "version": "1.0.0",
+  "description": "cd /home/user/0das/1; aws s3 sync . s3://das-1-docs/ --exclude 'data' --delete --dryrun",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "aws-sdk": "^2.307.0"
+  }
+}
