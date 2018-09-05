@@ -22,6 +22,7 @@ const etag = (fname, psmb) => new Promise((resolve, reject) => {
     pos += len;
   });
   rs.on('end', x => {
+    rs.close();
     let trash = crypto.createHash('md5').digest('hex'),
       last = hash.digest('hex');
     if (last !== trash) hashes.push(last);
