@@ -1,9 +1,9 @@
 const crypto = require('crypto'),
   fs = require('fs');
 
-const etag = (fname) => new Promise((resolve, reject) => {
+const etag = (fname, psmb) => new Promise((resolve, reject) => {
   const dt0 = Date.now();
-  let ps = 8 * 1024 * 1024, hashes = [], pos = 0, chunk,
+  let ps = (psmb || 8) * 1024 * 1024, hashes = [], pos = 0, chunk,
     hash = crypto.createHash('md5'),
     rs = fs.createReadStream(fname);
 
