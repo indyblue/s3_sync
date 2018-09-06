@@ -117,8 +117,9 @@ async function sync(path, bucket, prefix) {
       //console.log(JSON.stringify(process.memoryUsage()));
     }));
   });
-  logger.log(`*** done checking files: ${path}`);
+  logger.log(`*** done building file list: ${path}`);
   await Promise.all(aprs);
+  logger.log(`*** done hashing/comparing files: ${path}`);
   while (queue.length || qcnt) {
     await Promise.all(qprs);
   }
@@ -142,8 +143,8 @@ async function sync(path, bucket, prefix) {
   return true;
 }
 async function main() {
-  //await sync('/home/user/0das/1/Alphonsianum/Pious Reflections/', 'das-junk', '');
-  await sync('/home/user/0das/1/Alphonsianum/Preparation for Death/', 'das-junk', '');
+  // await sync('/home/user/0das/1/Alphonsianum/Pious Reflections/', 'das-junk', '');
+  // await sync('/home/user/0das/1/Alphonsianum/Preparation for Death/', 'das-junk', '');
   await sync('/home/user/0das/1/', 'das-1-docs', '');
   await sync('/home/user/0das/pdf/', 'das-pdf', '');
   return true;
