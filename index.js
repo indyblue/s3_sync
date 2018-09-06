@@ -104,20 +104,22 @@ async function sync(path, bucket, prefix) {
 
   s3config.map = await getRemote(s3config.bucket, prefix);
 
-  let ttl = 0, compl = 0;
+  let ttl = 0, compl = 0, aprs = [], filecnt = 0, filesize = 0;
   logger.log(`*** start checking files: ${path}`);
-  let aprs = [];
   const objs = await fs.deepstats('', path, stats => {
-    for (let s of stats) aprs.push(s3Action(s, s3config, x => {
-      ttl += s.size;
-      console.log(csn(compl), '/', csn(ttl), 'q', csn(qsize), queue.length, 'begin', s.key, s.size, 'code', s.eq);
-    }, x => {
-      compl += s.size;
-      console.log(csn(compl), '/', csn(ttl), 'end', s.key, s.size, 'time', Date.now() - s.dt0);
-      //console.log(JSON.stringify(process.memoryUsage()));
-    }));
+    for (let s of stats) {
+      if (s.isFile) { filecnt++; filesize += s.size; }
+      aprs.push(s3Action(s, s3config, x => {
+        ttl += s.size;
+        console.log(csn(compl), '/', csn(ttl), 'q', csn(qsize), queue.length, 'begin', s.key, s.size, 'code', s.eq);
+      }, x => {
+        compl += s.size;
+        console.log(csn(compl), '/', csn(ttl), 'end', s.key, s.size, 'time', Date.now() - s.dt0);
+        //console.log(JSON.stringify(process.memoryUsage()));
+      }));
+    }
   });
-  logger.log(`*** done building file list: ${path}`);
+  logger.log(`*** done building file list (${filecnt}, ${csn(filesize)}): ${path}`);
   await Promise.all(aprs);
   logger.log(`*** done hashing/comparing files: ${path}`);
   while (queue.length || qcnt) {
