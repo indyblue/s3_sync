@@ -38,6 +38,41 @@ async function getRemote(bucket, prefix) {
   return files;
 }
 
+async function getVersions(bucket, prefix) {
+  logger.write(`loading ${bucket}[${prefix}]:`);
+  const files = new Map();
+  function addR(arr, isDel) {
+    for (q of arr) {
+      if (isDel) q.Delete = true;
+      delete q.Owner;
+      delete q.StorageClass;
+      if (files.has(q.Key)) {
+        let val = files.get(q.Key);
+        val.objs.push(q);
+      } else {
+        files.set(q.Key, { key: q.Key, objs: [q] });
+      }
+    }
+  }
+  var objs = await s3.listObjectVersions({
+    Bucket: bucket,
+    Prefix: prefix,
+    MaxKeys: 1000
+  }).promise();
+  let np = objs;
+  addR(np.DeleteMarkers, 1);
+  addR(np.Versions);
+  logger.write('.');
+  while (np.$response.hasNextPage()) {
+    np = await np.$response.nextPage().promise();
+    addR(np.DeleteMarkers, 1);
+    addR(np.Versions);
+    logger.write('.');
+  }
+  logger.write('done\n');
+  return files;
+}
+
 async function s3Equal(lstat, s3map) {
   if (lstat.isDir) return 0;
   if (!lstat.isFile) return 0;
@@ -151,5 +186,17 @@ async function sync(path, bucket, prefix) {
   return true;
 }
 
-sync.printQueue = logger.pq;
-module.exports = sync;
+async function status(path, bucket, prefix) {
+  const dt0 = Date.now();
+  const s3config = { bucket: bucket, dry: false };
+
+  s3config.map = await getVersions(s3config.bucket, prefix);
+  let multi = Array.from(s3config.map.values()).filter(x => x.objs.length > 1);
+  console.log(multi.length);
+  console.log(JSON.stringify(multi, null, 2));
+}
+
+module.exports = {
+  sync, status,
+  printQueue: logger.pq
+};
