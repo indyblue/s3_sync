@@ -77,6 +77,7 @@ async function s3Equal(lstat, s3map) {
   if (lstat.isDir) return 0;
   if (!lstat.isFile) return 0;
   if (lstat.key === 'data') return 0;
+  if (lstat.key.indexOf('node_modules') >= 0) return 0;
   if (lstat.size === 0) return 0;
 
   if (!s3map.has(lstat.key)) return 1;
