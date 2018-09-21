@@ -2,6 +2,7 @@ const s3 = require('./s3-sync'),
   flag = x => ~process.argv.indexOf('-' + x);
 
 async function main() {
+  s3.consoleEmitters();
   let fn = () => console.log('choose action: u/d/s');
   if (flag('u')) fn = s3.sync;
   else if (flag('d')) fn = s3.download;

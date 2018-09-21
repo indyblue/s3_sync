@@ -1,5 +1,7 @@
 const { S3 } = require('aws-sdk'),
   fs = require('./fs-promise'),
+  EventEmitter = require('events'),
+  emitter = new EventEmitter(),
   sleep = ms => new Promise(res => setTimeout(res, ms)),
   psmb = 8,
   logger = {
@@ -141,41 +143,44 @@ async function sync(path, bucket, prefix) {
   s3config.map = await getRemote(s3config.bucket, prefix);
 
   let ttl = 0, compl = 0, aprs = [], upcnt = 0, filecnt = 0, filesize = 0;
-  logger.log(`*** start checking files: ${path}`);
+  emitter.emit('progress', { status: 'start', path });
   const objs = await fs.deepstats('', path, stats => {
     for (let s of stats) {
       if (s.isFile) { filecnt++; filesize += s.size; }
       aprs.push(s3Action(s, s3config, x => {
         upcnt++; ttl += s.size;
+        emitter.emit('afile-s', { status: 'begin', file: s, compl, ttl, queue: { size: qsize, len: queue.length } });
         console.log(csn(compl), '/', csn(ttl), 'q', csn(qsize), queue.length, 'begin', s.key, s.size, 'code', s.eq);
       }, x => {
         compl += s.size;
+        emitter.emit('afile-e', { status: 'end', file: s, compl, ttl });
         console.log(csn(compl), '/', csn(ttl), 'end', s.key, s.size, 'time', Date.now() - s.dt0);
         //console.log(JSON.stringify(process.memoryUsage()));
       }));
     }
   });
-  logger.log(`*** done building file list (${filecnt}, ${csn(filesize)}): ${path}`);
+  emitter.emit('progress', { status: 'file list done', path, filecnt, filesize });
   await Promise.all(aprs);
-  logger.log(`*** done hashing/comparing files: ${path}`);
+  emitter.emit('progress', { status: 'hash/compare done', path });
   while (queue.length || qcnt) {
     await Promise.all(qprs);
   }
-  logger.log(`*** done with all uploads: ${path}`);
-  logger.log(`*** deleting unused from s3: ${path}`);
+  emitter.emit('progress', { status: 'uploads done', path });
   let dels = Array.from(s3config.map.values()).filter(x => !x.used),
     delcnt = dels.length;
-  logger.write(dels.length.toString());
+  emitter.emit('progress', { status: 'begin delete', path, delcnt, files: dels.slice() });
   while (dels.length) {
-    let dprs = dels.splice(0, 40).map(x => s3.deleteObject({
+    let dbatch = dels.splice(0, 40);
+    let dprs = dbatch.map(x => s3.deleteObject({
       Bucket: s3config.bucket,
       Key: x.key
     }).promise());
     await Promise.all(dprs);
+    emitter.emit('delete', { status: 'batch', path, files: dbatch });
     logger.write('.');
   }
   //console.log(JSON.stringify(dels, null, 2));
-  logger.log(`*** done deleting: ${path}`);
+  emitter.emit('progress', { status: 'delete done', path });
 
   const dt1 = Date.now();
   logger.queue(`*** stats: ${path}`);
@@ -197,7 +202,32 @@ async function status(path, bucket, prefix) {
   console.log(JSON.stringify(multi, null, 2));
 }
 
+function consoleEmitters() {
+  emitter.on('progress', obj => {
+    let addl = '';
+    //console.log('progress event', obj);
+    switch (obj.status) {
+      case 'file list done':
+        addl = ` (${obj.filecnt}, ${csn(obj.filesize)})`;
+        break;
+      case 'begin delete':
+        addl = ` (${obj.delcnt})`;
+        break;
+    }
+    logger.log(`*** ${obj.status}${addl}: ${obj.path}`);
+  });
+
+  emitter.on('afile-s', o => logger.log(csn(o.compl), '/', csn(o.ttl),
+    'q', csn(o.queue.size), o.queue.len,
+    'begin', o.file.key, o.file.size, 'code', o.file.eq));
+  emitter.on('afile-e', o => logger.log(csn(o.compl), '/', csn(o.ttl),
+    'end', o.file.key, o.file.size, 'time', Date.now() - o.file.dt0));
+}
+
 module.exports = {
   sync, status,
-  printQueue: logger.pq
+  printQueue: logger.pq,
+  on: (name, ...a) => emitter.on(name, ...a),
+  once: (name, ...a) => emitter.once(name, ...a),
+  consoleEmitters
 };
