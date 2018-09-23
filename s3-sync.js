@@ -76,11 +76,11 @@ async function getVersions(bucket, prefix) {
 }
 
 async function s3Equal(lstat, s3map) {
-  if (lstat.isDir) return 0;
-  if (!lstat.isFile) return 0;
-  if (lstat.key === 'data') return 0;
-  if (lstat.key.indexOf('node_modules') >= 0) return 0;
-  if (lstat.size === 0) return 0;
+  if (lstat.isDir) return -1;
+  if (!lstat.isFile) return -1;
+  if (lstat.key === 'data') return -1;
+  if (lstat.key.indexOf('node_modules') >= 0) return -1;
+  if (lstat.size === 0) return -1;
 
   if (!s3map.has(lstat.key)) return 1;
   let rstat = s3map.get(lstat.key);
@@ -94,72 +94,65 @@ async function s3Equal(lstat, s3map) {
   else return 0;
 }
 
-let qcnt = 0, qsize = 0,
-  queue = [],
+let qcnt = 0, queue = [],
   tryq = (item) => {
     if (item) queue.push(item);
     if (qcnt < 20 && queue.length) {
-      let fn = queue.pop();
-      let pr = fn();
+      let obj = queue.pop();
+      emitter.emit('file-dq', obj.file);
+      let pr = obj.fn();
       qprs.push(pr);
     }
   },
   qprs = [];
-async function s3Action(lstat, s3config, cb0, cbThen) {
+async function s3Action(lstat, s3config) {
   lstat.eq = await s3Equal(lstat, s3config.map);
-  if (lstat.eq === 0) return true;
-
-  if (s3config.dry) console.log('dry', lstat.key, lstat.size);
-  else if (lstat.size === 0) return true; //console.log('zero', lstat.key, lstat.size);
-  else {
-    qsize += lstat.size;
-    let fnup = () => {
-      qcnt++; qsize -= lstat.size;
-      let dt0 = Date.now();
-      if (typeof cb0 === 'function') cb0();
-
-      let pr = s3.upload({
-        Bucket: s3config.bucket,
-        Key: lstat.key,
-        Body: fs.createReadStream(lstat.path),
-      }, { partSize: psmb * 1024 * 1024 }).promise();
-      if (typeof cbThen === 'function') pr = pr.then(cbThen).then(x => {
-        qcnt--;
-        tryq();
-      });
-      pr.lstat = lstat;
-      lstat.dt0 = dt0;
-      return pr;
-    };
-    tryq(fnup);
+  if (lstat.eq <= 0) {
+    if (lstat.eq < 0) emitter.emit('file-skip', lstat);
+    else emitter.emit('file-eq', lstat);
+    return true;
   }
+
+  let fnup = () => {
+    qcnt++;
+    let dt0 = Date.now();
+    emitter.emit('file-start', lstat);
+
+    let pr = s3.upload({
+      Bucket: s3config.bucket,
+      Key: lstat.key,
+      Body: fs.createReadStream(lstat.path),
+    }, { partSize: psmb * 1024 * 1024 }).promise();
+    pr = pr.then(x => {
+      emitter.emit('file-end', lstat);
+      qcnt--;
+      tryq();
+    });
+    pr.lstat = lstat;
+    lstat.dt0 = dt0;
+    return pr;
+  };
+  emitter.emit('file-q', lstat);
+  tryq({ file: lstat, fn: fnup });
 }
 
 const csn = n => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 async function sync(path, bucket, prefix) {
+  statReset();
   const dt0 = Date.now();
   const s3config = { bucket: bucket, dry: false };
 
   s3config.map = await getRemote(s3config.bucket, prefix);
 
-  let ttl = 0, compl = 0, aprs = [], upcnt = 0, filecnt = 0, filesize = 0;
+  let aprs = [];
   emitter.emit('progress', { status: 'start', path });
   const objs = await fs.deepstats('', path, stats => {
     for (let s of stats) {
-      if (s.isFile) { filecnt++; filesize += s.size; }
-      aprs.push(s3Action(s, s3config, x => {
-        upcnt++; ttl += s.size;
-        emitter.emit('afile-s', { status: 'begin', file: s, compl, ttl, queue: { size: qsize, len: queue.length } });
-        console.log(csn(compl), '/', csn(ttl), 'q', csn(qsize), queue.length, 'begin', s.key, s.size, 'code', s.eq);
-      }, x => {
-        compl += s.size;
-        emitter.emit('afile-e', { status: 'end', file: s, compl, ttl });
-        console.log(csn(compl), '/', csn(ttl), 'end', s.key, s.size, 'time', Date.now() - s.dt0);
-        //console.log(JSON.stringify(process.memoryUsage()));
-      }));
+      emitter.emit('file-all', s);
+      aprs.push(s3Action(s, s3config));
     }
   });
-  emitter.emit('progress', { status: 'file list done', path, filecnt, filesize });
+  emitter.emit('file-list-done', path);
   await Promise.all(aprs);
   emitter.emit('progress', { status: 'hash/compare done', path });
   while (queue.length || qcnt) {
@@ -168,7 +161,7 @@ async function sync(path, bucket, prefix) {
   emitter.emit('progress', { status: 'uploads done', path });
   let dels = Array.from(s3config.map.values()).filter(x => !x.used),
     delcnt = dels.length;
-  emitter.emit('progress', { status: 'begin delete', path, delcnt, files: dels.slice() });
+  emitter.emit('file-del', { path, delcnt, files: dels.slice() });
   while (dels.length) {
     let dbatch = dels.splice(0, 40);
     let dprs = dbatch.map(x => s3.deleteObject({
@@ -183,12 +176,8 @@ async function sync(path, bucket, prefix) {
   emitter.emit('progress', { status: 'delete done', path });
 
   const dt1 = Date.now();
-  logger.queue(`*** stats: ${path}`);
-  logger.queue(`    time elapsed: ${dt1 - dt0}`);
-  logger.queue(`    files checked: ${csn(filecnt)} / ${csn(filesize)}`);
-  logger.queue(`    files uploaded: ${csn(upcnt)} / ${csn(compl)}`);
-  logger.queue(`    files deleted: ${csn(delcnt)}`);
-  //await sleep(2000);
+  emitter.emit('end', { dt0, dt1, path });
+
   return true;
 }
 
@@ -202,26 +191,74 @@ async function status(path, bucket, prefix) {
   console.log(JSON.stringify(multi, null, 2));
 }
 
+const statPrint = s => csn(s.len) + '/' + csn(s.size);
+let statReset, statObject;
+function StatsEvents() {
+  let all, done, skip, eq, q, active, del;
+  const stat = o => Object.assign({ len: 0, size: 0 }, o),
+    arem = (a, o) => {
+      let i = a.indexOf(o);
+      if (i >= 0) a.splice(i, 1);
+    },
+    op = (s, files, o = 1) => {
+      if (!Array.isArray(files)) files = [files];
+      o = o < 0 ? -1 : 1;
+      for (let f of files) {
+        s.len += o;
+        s.size += o * f.size;
+        if ('files' in s) {
+          if (o < 0) arem(s.files, f);
+          else s.files.push(f);
+        }
+      }
+      emitter.emit('stats', statObject);
+    }, sp = statPrint;
+  statReset = () => {
+    all = stat(); done = stat(); skip = stat(); eq = stat();
+    q = stat(); active = stat({ files: [] }); del = stat({ files: [] });
+    statObject = { all, done, skip, eq, q, active, del };
+  };
+  statReset();
+  emitter.on('file-all', f => op(all, f));
+  emitter.on('file-skip', f => op(skip, f));
+  emitter.on('file-eq', f => op(eq, f));
+  emitter.on('file-q', f => op(q, f));
+  emitter.on('file-dq', f => op(q, f, -1));
+  //emitter.on('file-start', f => op(done, f));
+  emitter.on('file-end', f => op(done, f));
+  emitter.on('file-list-done', path => {
+    emitter.emit('progress', {
+      status: `file list done ${sp(all)}`,
+      path
+    });
+  });
+  emitter.on('file-del', ({ path, delcnt, files }) => {
+    op(del, files);
+    emitter.emit('progress', { status: 'begin delete', path, delcnt, files });
+  });
+  emitter.on('end', ({ dt0, dt1, path }) => {
+    logger.queue(`*** stats: ${path}`);
+    logger.queue(`    time elapsed: ${dt1 - dt0}`);
+    logger.queue(`    files checked: ${sp(all)}`);
+    logger.queue(`    files uploaded: ${sp(done)}`);
+    logger.queue(`    files unchanged: ${sp(eq)}`);
+    logger.queue(`    files skipped: ${sp(skip)}`);
+    logger.queue(`    files deleted: ${sp(del)}`);
+  });
+}
+StatsEvents();
+
 function consoleEmitters() {
   emitter.on('progress', obj => {
-    let addl = '';
-    //console.log('progress event', obj);
-    switch (obj.status) {
-      case 'file list done':
-        addl = ` (${obj.filecnt}, ${csn(obj.filesize)})`;
-        break;
-      case 'begin delete':
-        addl = ` (${obj.delcnt})`;
-        break;
-    }
-    logger.log(`*** ${obj.status}${addl}: ${obj.path}`);
+    logger.log(`*** ${obj.status}: ${obj.path}`);
   });
 
-  emitter.on('afile-s', o => logger.log(csn(o.compl), '/', csn(o.ttl),
-    'q', csn(o.queue.size), o.queue.len,
-    'begin', o.file.key, o.file.size, 'code', o.file.eq));
-  emitter.on('afile-e', o => logger.log(csn(o.compl), '/', csn(o.ttl),
-    'end', o.file.key, o.file.size, 'time', Date.now() - o.file.dt0));
+  emitter.on('file-start', file => logger.log(
+    statPrint(statObject.done), 'q', statPrint(statObject.q),
+    'begin', file.key, file.size, 'code', file.eq));
+  emitter.on('file-end', file => logger.log(
+    statPrint(statObject.done), 'q', statPrint(statObject.q),
+    'end', file.key, file.size, 'time', Date.now() - file.dt0));
 }
 
 module.exports = {
