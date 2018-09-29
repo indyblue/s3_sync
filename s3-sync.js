@@ -76,12 +76,6 @@ async function getVersions(bucket, prefix) {
 }
 
 async function s3Equal(lstat, s3map) {
-  if (lstat.isDir) return -1;
-  if (!lstat.isFile) return -1;
-  if (lstat.key === 'data') return -1;
-  if (lstat.key.indexOf('node_modules') >= 0) return -1;
-  if (lstat.size === 0) return -1;
-
   if (!s3map.has(lstat.key)) return 1;
   let rstat = s3map.get(lstat.key);
   rstat.used = true;
@@ -107,12 +101,15 @@ let qcnt = 0, queue = [],
   qprs = [];
 async function s3Action(lstat, s3config) {
   lstat.eq = await s3Equal(lstat, s3config.map);
-  if (lstat.eq <= 0) {
-    if (lstat.eq < 0) emitter.emit('file-skip', lstat);
-    else emitter.emit('file-eq', lstat);
-    return true;
+  if (lstat.eq === 0) {
+    emitter.emit('file-eq', lstat);
+    return;
   }
 
+  if (s3config.dry) {
+    emitter.emit('file-end', lstat);
+    return;
+  }
   let fnup = () => {
     qcnt++;
     let dt0 = Date.now();
@@ -136,8 +133,17 @@ async function s3Action(lstat, s3config) {
   tryq({ file: lstat, fn: fnup });
 }
 
+const chkFilter = (stat, filters) => {
+  if (!filters || !Array.isArray(filters)) return false;
+  for (let f of filters) {
+    if (f instanceof RegExp && f.test(stat.key)) return true;
+    else if (typeof f === 'string' && stat.key.indexOf(f) >= 0) return true;
+    else if (typeof f === 'function' && f(stat.key) === true) return true;
+  }
+  return false;
+};
 const csn = n => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-async function sync(path, bucket, prefix) {
+async function sync(path, bucket, prefix, filters) {
   statReset();
   const dt0 = Date.now();
   const s3config = { bucket: bucket, dry: false };
@@ -148,7 +154,13 @@ async function sync(path, bucket, prefix) {
   emitter.emit('progress', { status: 'start', path });
   const objs = await fs.deepstats('', path, stats => {
     for (let s of stats) {
+      if (s.isDir || !s.isFile || s.size === 0
+        || chkFilter(s, filters)) {
+        emitter.emit('file-skip', s);
+        continue;
+      }
       emitter.emit('file-all', s);
+
       aprs.push(s3Action(s, s3config));
     }
   });
@@ -162,7 +174,8 @@ async function sync(path, bucket, prefix) {
   let dels = Array.from(s3config.map.values()).filter(x => !x.used),
     delcnt = dels.length;
   emitter.emit('file-del', { path, delcnt, files: dels.slice() });
-  while (dels.length) {
+  if (s3config.dry) console.log(dels.map(x => x.key).join('\n'));
+  while (!s3config.dry && dels.length) {
     let dbatch = dels.splice(0, 40);
     let dprs = dbatch.map(x => s3.deleteObject({
       Bucket: s3config.bucket,
