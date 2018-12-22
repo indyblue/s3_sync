@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html;charset=ISO-8859-1">
+	<title>Attributes example</title>
+	<script type="text/javascript" src='poly-map.js'></script>
+	<script type="text/javascript" src='ttools.js'></script>
+	<script type="text/javascript" src='templar-s.js'></script>
+	<script type="text/javascript" src='json_websocket.js'></script>
+	<style>
+		.red {
+			background-color: red;
+		}
+
+		.fc {
+			display: flex;
+			flex-direction: column;
+			align-items: stretch;
+		}
+
+		.fr {
+			flex: 1;
+			display: flex;
+			flex-direction: row;
+		}
+
+		.fr:nth-child(even) {
+			background: lightgray;
+		}
+
+		.fg {
+			flex: 1;
+		}
+
+		.fs {
+			flex: 0 0;
+			white-space: nowrap;
+			display: inline-block;
+			border: 1px solid gray;
+		}
+	</style>
+</head>
+
+<body>
+	<template id='root'>
+		<div data-repeat-b='model.dirs'>
+			<button on-click='{{buttonClick}}'>{{b.name}}</button>
+		</div>
+		<br/>
+		<div data-model-s='model.fetch'>fetch: 
+			<span>{{s.length}}</span> done: <span>{{s.done}}</span>
+		</div>
+		<div>Scan status: <span>{{model.complete}}</span></div>
+		<div>All: <span data-template='#stat' data-model-s='model.stats.all'></span></div>
+		<div>Queue: <span data-template='#stat' data-model-s='model.stats.q'></span></div>
+		<div>Delete: <span data-template='#stat' data-model-s='model.stats.del'></span></div>
+		<div>Skip: <span data-template='#stat' data-model-s='model.stats.skip'></span></div>
+		<div>Equal: <span data-template='#stat' data-model-s='model.stats.eq'></span></div>
+		<br/>
+		<br/>
+		<div class='fc' data-template='#queue' data-repeat-q='model.queue'></div>
+	</template>
+	<template id='stat'><span data-model-s'>
+		<span>{:{csn(dp('s.len'))}}</span> - <span>{:{csn(dp('s.size'))}}</span>
+	</span></template>
+	<template id='queue'><div class='fr' data-model-q'>
+		<span class='fg' >{{q.key}}</span> 
+		<span class='fs'>
+			<b>{{q.eq}}</b> - <span>{:{csn(dp('q.size'))}}</span> / <span>{{q.mtime}}</span>
+		</span>
+	</div></template>
+
+	<div id='main'></div>
+	<script>
+		'use strict';
+		function csn(n) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+		function statPrint(s) { return csn(s.len) + '/' + csn(s.size); }
+		var data = {
+			queue: []
+		};
+		var ctx = {
+			buttonClick: function (ctx, path, ev, event) {
+				data.queue.splice(0);
+				data.complete = 'in progress';
+				var entry = ev('b');
+				console.log('click', entry);
+				window.jsonWsHandler.sendJson(entry.name, entry);
+			},
+			debug: 0
+		};
+		var tmp = new Templar('#main', '#root', data, ctx);
+		tmp.exec();
+		//tmp.monLog();
+		//tmp.recalc();
+
+	</script>
+	<script>
+		'use strict';
+		(function () {
+			var jh = window.jsonWsHandler;
+
+			console.log('ws://' + window.location.host + '/');
+			var ws = new WebSocket('ws://' + window.location.host + '/');
+			ws.onopen = function () {
+				jh.addConn(ws);
+				ws.onmessage = jh.ondata;
+				jh.sendJson('asdf', { a: 1, b: 2 });
+				var data = JSON.stringify({
+					type: 'test',
+					payload: 'hello world '//.repeat(4000)
+				})
+			};
+			ws.onclose = function () { jh.remConn(ws); };
+		})();
+	</script>
+	<script>
+		/************************************************************************/
+		// websocket event handlers:
+		/************************************************************************/
+		window.jsonWsHandler
+			.addCbJson(/.*/i, function (p, e) {
+				// console.log(e, p);
+			})
+			.addCbJson('init', addHandlers);
+
+		function addHandlers(obj) {
+			var ev = obj.events;
+			tmp.model.dirs = obj.dirs;
+			tmp.recalc();
+			window.jsonWsHandler
+				.addCbJson(ev.stats, function (s, e) {
+					tmp.model.stats = s;
+					tmp.recalc();
+				})
+				.addCbJson(ev.file_q, function (s, e) {
+					tmp.model.queue.push(s);
+					tmp.recalc();
+				})
+				.addCbJson(ev.get_remote, function (s, e) {
+					tmp.model.fetch = s;
+					tmp.recalc();
+				})
+				.addCbJson(ev.file_unused, function (s, e) {
+					console.log('del', s);
+					Array.prototype.push.apply(tmp.model.queue, s.files);
+					tmp.recalc();
+				})
+				.addCbJson(ev.end, function (s, e) {
+					tmp.model.complete = 'scan complete';
+					tmp.recalc();
+				});
+		}
+	</script>
+</body>
+
+</html>

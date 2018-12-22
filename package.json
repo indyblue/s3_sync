@@ -9,6 +9,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "aws-sdk": "^2.307.0"
+    "aws-sdk": "^2.307.0",
+    "template.das": "file:../my_modules/template.das"
   }
 }
