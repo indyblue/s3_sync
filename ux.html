@@ -14,31 +14,54 @@
 			background-color: red;
 		}
 
-		.fc {
+		.hide {
+			display: none;
+		}
+
+		.local {
+			background-color: lightblue;
+		}
+
+		.s3 {
+			background-color: lightpink;
+		}
+
+		.both {
+			background-color: lightgreen;
+		}
+
+		s {
+			display: inline;
+			text-decoration: none;
+		}
+
+		fc {
 			display: flex;
 			flex-direction: column;
 			align-items: stretch;
 		}
 
-		.fr {
+		fr {
 			flex: 1;
 			display: flex;
 			flex-direction: row;
+			border-bottom: 1px solid black;
 		}
 
-		.fr:nth-child(even) {
-			background: lightgray;
-		}
-
-		.fg {
+		fg {
 			flex: 1;
 		}
 
-		.fs {
+		fs {
 			flex: 0 0;
 			white-space: nowrap;
 			display: inline-block;
 			border: 1px solid gray;
+		}
+
+		ul {
+			margin: 0px;
+			padding: 3px 2em;
 		}
 	</style>
 </head>
@@ -49,44 +72,78 @@
 			<button on-click='{{buttonClick}}'>{{b.name}}</button>
 		</div>
 		<br/>
+		<div>Current: <ul>
+			<li>{{model.current.name}}</li>
+			<li>{{model.current.args[0]}}</li>
+			<li>{{model.current.args[1]}}</li>
+		</ul></div>
+		<br/>
+		<div data-model-t='model.timer'>Scan status: <s>{{model.complete}}</s><br/>
+			Scan time: <s>{:{qq('t.start') ? csn((qq('t.end')||Date.now()) - qq('t.start')) : '' }!}</s></div>
 		<div data-model-s='model.fetch'>fetch: 
-			<span>{{s.length}}</span> done: <span>{{s.done}}</span>
+			<s>{{s.length}}</s> done: <s>{{s.done}}</s>
 		</div>
-		<div>Scan status: <span>{{model.complete}}</span></div>
-		<div>All: <span data-template='#stat' data-model-s='model.stats.all'></span></div>
-		<div>Queue: <span data-template='#stat' data-model-s='model.stats.q'></span></div>
-		<div>Delete: <span data-template='#stat' data-model-s='model.stats.del'></span></div>
-		<div>Skip: <span data-template='#stat' data-model-s='model.stats.skip'></span></div>
-		<div>Equal: <span data-template='#stat' data-model-s='model.stats.eq'></span></div>
+		<br/>
+		<div>Local/Both: <s data-template='#stat' data-model-s='model.stats.q'></s></div>
+		<div>S3 only: <s data-template='#stat' data-model-s='model.stats.del'></s></div>
+		<br/>
+		<div>Equal: <s data-template='#stat' data-model-s='model.stats.eq'></s></div>
+		<div>Skip: <s data-template='#stat' data-model-s='model.stats.skip'></s></div>
+		<div>All: <s data-template='#stat' data-model-s='model.stats.all'></s></div>
 		<br/>
 		<br/>
-		<div class='fc' data-template='#queue' data-repeat-q='model.queue'></div>
+		<input value-bind value="{{model.qfilter}}"/>
+		<button on-click="{?{ctx.ist.recalc()}}">Filter</button>
+		<fc data-template='#queue' data-repeat-q='model.queue'></fc>
 	</template>
-	<template id='stat'><span data-model-s'>
-		<span>{:{csn(dp('s.len'))}}</span> - <span>{:{csn(dp('s.size'))}}</span>
-	</span></template>
-	<template id='queue'><div class='fr' data-model-q'>
-		<span class='fg' >{{q.key}}</span> 
-		<span class='fs'>
-			<b>{{q.eq}}</b> - <span>{:{csn(dp('q.size'))}}</span> / <span>{{q.mtime}}</span>
-		</span>
-	</div></template>
+
+	<template id='stat'><s data-model-s'>
+		<s>{:{csn(qq('s.len'))}}</s> - <s>{:{csn(qq('s.size'))}}</s>
+	</s></template>
+
+	<template id='queue'><fr data-model-q' on-click="{{qLogClick}}"
+		class="{:{eqTxt(qq('q.eq'))}} {:{qFilter(qq)}}" >
+		<fg >{{q.key}}</fg> 
+		<fs>
+			<b>{:{eqTxt(qq('q.eq'))}}</b> - <s>{:{csn(qq('q.size'))}}</s> 
+			<!-- / <s>{{q.mtime}}</s> -->
+		</fs>
+	</fr></template>
 
 	<div id='main'></div>
 	<script>
 		'use strict';
 		function csn(n) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+		function eqTxt(eq) {
+			if (eq === 1) return 'local';
+			else if (eq > 1) return 'both';
+			else return 's3';
+		}
+		function qFilter(qq) {
+			var key = qq('q.key')
+				, flt = qq('model.qfilter');
+			var rx = new RegExp(flt, 'i');
+			return rx.test(key) ? '' : 'hide';
+		}
 		function statPrint(s) { return csn(s.len) + '/' + csn(s.size); }
 		var data = {
-			queue: []
+			queue: [],
+			qfilter: '',
+			timer: {}
 		};
 		var ctx = {
-			buttonClick: function (ctx, path, ev, event) {
+			buttonClick: function (ctx, path, qq, event) {
 				data.queue.splice(0);
 				data.complete = 'in progress';
-				var entry = ev('b');
+				data.timer.start = Date.now(); data.timer.end = null;
+				var entry = qq('b');
+				data.current = entry;
 				console.log('click', entry);
 				window.jsonWsHandler.sendJson(entry.name, entry);
+			},
+			qLogClick: function (ctx, path, qq, event) {
+				var entry = qq('q');
+				console.log(entry);
 			},
 			debug: 0
 		};
@@ -120,9 +177,9 @@
 		// websocket event handlers:
 		/************************************************************************/
 		window.jsonWsHandler
-			.addCbJson(/.*/i, function (p, e) {
-				// console.log(e, p);
-			})
+			// .addCbJson(/.*/i, function (p, e) {
+			// 	console.log(e, p);
+			// })
 			.addCbJson('init', addHandlers);
 
 		function addHandlers(obj) {
@@ -149,6 +206,9 @@
 				})
 				.addCbJson(ev.end, function (s, e) {
 					tmp.model.complete = 'scan complete';
+					console.log(s);
+					tmp.model.timer.start = s.dt0;
+					tmp.model.timer.end = s.dt1;
 					tmp.recalc();
 				});
 		}

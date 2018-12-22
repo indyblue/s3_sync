@@ -1,4 +1,6 @@
 const { S3 } = require('aws-sdk'),
+  $path = require('path'),
+  pj = $path.join,
   fs = require('./fs-promise'),
   EventEmitter = require('events'),
   emitter = new EventEmitter(),
@@ -44,7 +46,7 @@ const chkFilter = (stat, filters) => {
   return false;
 };
 
-async function getRemote(bucket) {
+async function getRemote(bucket, lpath) {
   logger.write(`loading ${bucket}:`);
   const files = new Map();
   function addR(arr) {
@@ -52,7 +54,8 @@ async function getRemote(bucket) {
       //if (/-/.test(q.ETag)) logger.log(q.Key, q.Size, q.ETag);
       files.set(q.Key, {
         key: q.Key, size: q.Size, bucket,
-        etag: q.ETag.replace(/"/g, '')
+        etag: q.ETag.replace(/"/g, ''),
+        path: pj(lpath, q.Key)
       });
     }
     emitter.emit(ev.get_remote, { length: files.size, done: false });
@@ -75,15 +78,13 @@ async function getRemote(bucket) {
 }
 
 async function s3Equal(lstat, s3map) {
-  if (!s3map.has(lstat.key)) return lstat.eq = 1;
+  if (!s3map.has(lstat.key)) { return lstat.eq = 1; }
   let rstat = s3map.get(lstat.key);
   rstat.used = true;
   lstat.s3 = rstat;
-  if (lstat.size !== rstat.size) return lstat.eq = 2;
+  if (lstat.size !== rstat.size) { return lstat.eq = 2; }
   let letag = await lstat.etag(psmb);
-  if (letag !== rstat.etag) {
-    return lstat.eq = 3;
-  }
+  if (letag !== rstat.etag) { return lstat.eq = 3; }
   else return lstat.eq = 0;
 }
 
@@ -92,7 +93,7 @@ async function sync(path, bucket, filters) {
   const dt0 = Date.now();
   const s3config = { bucket: bucket, dry: false };
 
-  s3config.map = await getRemote(s3config.bucket);
+  s3config.map = await getRemote(s3config.bucket, path);
 
   let aprs = [];
   emitter.emit(ev.progress, { status: 'start', path });
@@ -134,8 +135,18 @@ async function sync(path, bucket, filters) {
 const statPrint = s => csn(s.len) + '/' + csn(s.size);
 let statReset, statObject;
 function StatsEvents() {
-  let all, done, skip, eq, q, active, del;
-  const stat = o => Object.assign({ len: 0, size: 0 }, o),
+  let all, done, skip, eq, q, active, del
+    , lastStat = 0, pendStat = false;
+  const
+    emitStat = () => {
+      if (!lastStat) {
+        emitter.emit(ev.stats, statObject);
+        pendStat = false;
+        lastStat++;
+        setTimeout(() => { lastStat = 0; if (pendStat) emitStat(); }, 200);
+      } else pendStat = true;
+    }
+    , stat = o => Object.assign({ len: 0, size: 0 }, o),
     arem = (a, o) => {
       let i = a.indexOf(o);
       if (i >= 0) a.splice(i, 1);
@@ -151,7 +162,7 @@ function StatsEvents() {
           else s.files.push(f);
         }
       }
-      emitter.emit(ev.stats, statObject);
+      emitStat();
     }, sp = statPrint;
   statReset = () => {
     all = stat(); done = stat(); skip = stat(); eq = stat();
