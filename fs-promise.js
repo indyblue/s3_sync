@@ -1,4 +1,5 @@
 const fso = require('fs'),
+  { ensureFileSync } = require('fs-extra'),
   $path = require('path'),
   pj = $path.join,
   util = require('util'),
@@ -11,6 +12,7 @@ const fso = require('fs'),
       path: p || f,
       isDir: x.isDirectory(),
       isFile: x.isFile(),
+      isLocal: true,
       etag: (psmb) => etag(p || f, psmb)
     }, x)),
     readstats: async (dir, root) => {
@@ -31,7 +33,10 @@ const fso = require('fs'),
       if (!hasCb) for (let r of results) stats.push(...r);
       return stats;
     },
-    createReadStream: fso.createReadStream
+    createReadStream: fso.createReadStream,
+    createWriteStream: fso.createWriteStream,
+    unlinkSync: fso.unlinkSync,
+    ensureFileSync
   };
 
 module.exports = fs;

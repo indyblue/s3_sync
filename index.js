@@ -17,6 +17,9 @@ const s3 = require('./s3-sync')
       c: 't4', name: 'temp4: dictionaries',
       args: ['/home/user/0das/pdf/Latin/dictionaries/', 'das-junk']
     }, {
+      c: 't5', name: 'super temp',
+      args: ['/home/user/0das/temp/das-junk/', 'das-junk']
+    }, {
       c: '1', name: 'archive: ~/0das/1/',
       args: ['/home/user/0das/1/', 'das-1-docs']
     }, {
@@ -27,19 +30,21 @@ const s3 = require('./s3-sync')
       args: ['/home/user/www/', 'das-www']
     }
   ];
-
+let srv;
 
 async function main() {
   let fn = () => console.log('choose action: u/d/s');
+  let fnDone = () => { };
   if (flag('u')) {
     s3.consoleEmitters();
     fn = sync;
     s3.simpleS3Queue();
+    fnDone = () => { process.exit(); };
   }
   else if (flag('d')) fn = s3.download;
   else if (flag('s')) fn = s3.status;
   else {
-    const srv = web.new();
+    srv = web.new();
     srv
       .addHandler(true, web.files)
       .addHandler(true, web.modFiles)
@@ -55,6 +60,7 @@ async function main() {
     }
   }
   s3.printQueue();
+  fnDone();
   return true;
 }
 main();
@@ -65,10 +71,13 @@ function s3Socket(srv) {
   srv.jh.cbConn = ws => srv.jh.sendJson('init',
     { events: s3.ev, dirs }, ws);
   srv.jh
-    .addCbJson(/.*/i, function (p, e) {
-      console.log('json msg', e, p);
-      srv.jh.sendJson('ack', { txt: 'message received', obj: p }, this);
-    });
+    // .addCbJson(/.*/i, function (p, e) {
+    //   console.log('json msg', e, p);
+    //   srv.jh.sendJson('ack', { txt: 'message received', obj: p }, this);
+    // })
+    .addCbJson('actionQueue', (p, e) =>
+      s3.actionQueue(p, true));
+
   let inProgress = false;
   for (var d of dirs) srv.jh.addCbJson(d.name, async o => {
     if (inProgress) console.log('*** reject, another sync is in progress', d.name);
@@ -89,7 +98,30 @@ function s3Socket(srv) {
     srv.jh.sendJson(s3.ev.file_unused, f));
   s3.on(s3.ev.end, f =>
     srv.jh.sendJson(s3.ev.end, f));
+  s3.on(s3.ev.file_start, f =>
+    f.size > 1 << 20 ? srv.jh.sendJson(s3.ev.file_start, f) : null);
+  s3.on(s3.ev.file_end, f =>
+    srv.jh.sendJson(s3.ev.file_end, f));
 
   /************************************************************************/
 
 }
+
+process.stdin.setEncoding('utf8');
+process.stdin.resume();
+process.stdin.on('data', d => {
+  d = d.trim();
+  console.log(d, d === 'q');
+  if (d === 'q') process.exit();
+});
+
+const onExit = () => {
+  if (srv) {
+    console.log('stopping server', srv.port);
+    srv.server.close();
+  }
+};
+process.on('exit', onExit);
+process.on('SIGTERM', () => process.exit(1));
+process.on('SIGINT', () => process.exit(1));
+
