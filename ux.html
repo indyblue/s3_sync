@@ -7,7 +7,7 @@
 	<title>S3 Sync</title>
 	<script type="text/javascript" src='poly-map.js'></script>
 	<script type="text/javascript" src='ttools.js'></script>
-	<script type="text/javascript" src='templar-s.js'></script>
+	<script type="text/javascript" src='templar.js'></script>
 	<script type="text/javascript" src='json_websocket.js'></script>
 	<style>
 		body {
@@ -107,7 +107,7 @@
 					Scan time:
 					<s>{:{qq('t.start') ? csn((qq('t.end')||Date.now()) -
 						qq('t.start')) : ''
-						}!}</s>
+						}}</s>
 				</div>
 				<div x-model-s='model.fetch'>fetch:
 					<s>{{s.length}}</s> done: <s>{{s.done}}</s>
@@ -153,7 +153,7 @@
 		<template id='queue'>
 			<fr x-model-q' class="{{q.eq.*eqTxt}} {{q.*qFilter}}">
 				<fs>{{q.action.*actionTxt}} &nbsp;</fs>
-				<fg>{{q.key}}{{q.dt0.*fmtActive}!}</fg>
+				<fg>{{q.key}}{{q.dt0.*fmtActive}}</fg>
 				<fs>
 					<b>{{q.eq.*eqTxt}}</b> - <s>{{q.size.*csn}}</s>
 				</fs>

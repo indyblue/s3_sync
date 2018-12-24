@@ -4,6 +4,7 @@
   "description": "cd /home/user/0das/1; aws s3 sync . s3://das-1-docs/ --exclude 'data' --delete --dryrun",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
