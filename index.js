@@ -1,4 +1,5 @@
 const s3 = require('./s3-sync')
+  , { exec } = require('child_process')
   , web = require('template.das')
   , flag = x => ~process.argv.indexOf('-' + x)
   , filters = [/\bnode_modules\b/, /^data$/, /~$/, /\.swp$/]
@@ -30,7 +31,7 @@ const s3 = require('./s3-sync')
       args: ['/home/user/www/', 'das-www']
     }
   ];
-let srv;
+let srv, gchrome;
 
 async function main() {
   let fn = () => console.log('choose action: u/d/s');
@@ -45,10 +46,14 @@ async function main() {
   else if (flag('s')) fn = s3.status;
   else {
     srv = web.new();
-    srv
+    await srv
+      .addHandler(/tmp\/(.*)/, web.modFiles(1))
       .addHandler(true, web.files)
-      .addHandler(true, web.modFiles)
       .start();
+    //or xdg-open?
+    gchrome = exec(`google-chrome --app=http://${srv.host}:${srv.port}/ux.html`);
+    gchrome.stdout.pipe(process.stdout);
+    gchrome.stderr.pipe(process.stderr);
 
     s3Socket(srv);
   }
@@ -63,7 +68,8 @@ async function main() {
   fnDone();
   return true;
 }
-main();
+main()
+  .catch(e => console.log(e));
 
 function s3Socket(srv) {
   /************************************************************************/
