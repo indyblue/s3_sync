@@ -1,0 +1,52 @@
+body { overflow-y: scroll; }
+.hide { display: none; }
+#fcompl .hide { display:inherit; }
+
+.local { background-color: lightblue; }
+.s3 { background-color: lightpink; }
+.both { background-color: lightgreen; }
+
+s {
+  display: inline;
+  text-decoration: none;
+}
+
+fc {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+fr {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+}
+
+fg {
+  flex: 1;
+}
+
+fs {
+  white-space: nowrap;
+  display: inline-block;
+}
+
+ul {
+  margin: 0px;
+  padding: 3px 2em;
+}
+
+/* * { border: 1px solid black; } */
+
+input[type=checkbox] { display: none; }
+input[type=checkbox]+label {
+  display: inline-block;
+  border: 3px outset lightgray;
+  background-color: lightgray;
+  border-radius: 5px;
+  padding: .5em 1em;
+}
+input[type=checkbox]:checked+label { border-style: inset; }
+
+button { padding: .5em 1em; margin: 5px;}

@@ -51,10 +51,11 @@ async function main() {
       .addHandler(true, web.files)
       .start();
     //or xdg-open?
-    gchrome = exec(`google-chrome --app=http://${srv.host}:${srv.port}/ux.html`);
-    gchrome.stdout.pipe(process.stdout);
-    gchrome.stderr.pipe(process.stderr);
-
+    if (flag('g')) {
+      gchrome = exec(`google-chrome --app=http://${srv.host}:${srv.port}/ux.html`);
+      gchrome.stdout.pipe(process.stdout);
+      gchrome.stderr.pipe(process.stderr);
+    }
     s3Socket(srv);
   }
 
