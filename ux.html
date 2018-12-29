@@ -112,7 +112,7 @@
 			else if (eq === 1) return '[^]';
 			else return '';
 		}
-		function qFilter(o, ctx, key, spath, qq) {
+		function qFilter(o, ctx, key, p, spath, qq) {
 			var qtxt = qq('model.filter.q')
 				, clocal = qq('model.filter.local')
 				, cs3 = qq('model.filter.s3')
