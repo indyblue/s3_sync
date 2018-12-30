@@ -113,6 +113,7 @@
 			else return '';
 		}
 		function qFilter(o, ctx, key, p, spath, qq) {
+			if(!o) return '';
 			var qtxt = qq('model.filter.q')
 				, clocal = qq('model.filter.local')
 				, cs3 = qq('model.filter.s3')
