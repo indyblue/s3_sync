@@ -83,7 +83,7 @@
 		<template id='queue'>
 			<fr x-model-q' class="{{q.eq.*eqTxt}} {{q.*qFilter}}">
 				<fs>{{q.action.*actionTxt}} &nbsp;</fs>
-				<fg>{{q.key}}{{q.dt0.*fmtActive}}</fg>
+				<fg><span>{{q.key}}</span><div>{{q.dt0.*fmtActive}}</div></fg>
 				<fs>
 					<b>{{q.eq.*eqTxt}}</b> - <s>{{q.size.*csn}}</s>
 				</fs>
@@ -112,7 +112,7 @@
 			else if (eq === 1) return '[^]';
 			else return '';
 		}
-		function qFilter(o, ctx, key, p, spath, qq) {
+		function qFilter(o, p, ctx, key, spath, qq) {
 			if(!o) return '';
 			var qtxt = qq('model.filter.q')
 				, clocal = qq('model.filter.local')
@@ -156,7 +156,7 @@
 			var ival = 500, ms = Date.now() - dt0, secs = Math.floor(ms / 1000),
 				len = Math.round((ms / ival) % 50);
 			setTimeout(function () { ctx.ist.recalc(); }, ival);
-			return '<br/>' + secs + ('='.repeat(len)) + '&gt;';
+			return secs + ('='.repeat(len)) + '>';
 		}
 	</script>
 
