@@ -151,7 +151,7 @@
 			var q = tmp.model.queue.filter(x => x.uxShow && x.action);
 			window.jsonWsHandler.sendJson('actionQueue', q);
 		}
-		function fmtActive(dt0, ctx) {
+		function fmtActive(dt0, p, ctx) {
 			if (!dt0) return '';
 			var ival = 500, ms = Date.now() - dt0, secs = Math.floor(ms / 1000),
 				len = Math.round((ms / ival) % 50);
