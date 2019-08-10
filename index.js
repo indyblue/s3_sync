@@ -1,36 +1,51 @@
-const s3 = require('./s3-sync')
-  , { exec } = require('child_process')
-  , web = require('template.das')
-  , flag = x => ~process.argv.indexOf('-' + x)
-  , filters = [/\bnode_modules\b/, /^data$/, /~$/, /\.swp$/]
-  , sync = (s, d) => s3.sync(s, d, filters)
-  , dirs = [
-    {
-      c: 't1', name: 'temp1: Pious Reflections',
-      args: ['/home/user/0das/1/Alphonsianum/Pious Reflections/', 'das-junk']
-    }, {
-      c: 't2', name: 'temp2: Preparation for Death',
-      args: ['/home/user/0das/1/Alphonsianum/Preparation for Death/', 'das-junk']
-    }, {
-      c: 't3', name: 'temp3: Gildersleeve',
-      args: ['/home/user/0das/pdf/Latin/Gildersleeve/', 'das-junk']
-    }, {
-      c: 't4', name: 'temp4: dictionaries',
-      args: ['/home/user/0das/pdf/Latin/dictionaries/', 'das-junk']
-    }, {
-      c: 't5', name: 'super temp',
-      args: ['/home/user/0das/temp/das-junk/', 'das-junk']
-    }, {
-      c: '1', name: 'archive: ~/0das/1/',
-      args: ['/home/user/0das/1/', 'das-1-docs']
-    }, {
-      c: 'p', name: 'archive: ~/0das/pdf/',
-      args: ['/home/user/0das/pdf/', 'das-pdf']
-    }, {
-      c: 'w', name: 'archive: ~/www/',
-      args: ['/home/user/www/', 'das-www']
-    }
-  ];
+#!/usr/bin/env node
+const s3 = require('./s3-sync');
+const { exec } = require('child_process');
+const web = require('template.das');
+const flag = x => ~process.argv.indexOf('-' + x);
+const filters = [/\bnode_modules\b/, /^data$/, /~$/, /\.swp$/,
+  /^node.cp.cpdata$/, /^node.cp.enc/,
+  /^node.temp/, /^node.das.breviarium.divinum-officium/];
+const sync = (s, d) => s3.sync(s, d, filters);
+const dirs = [
+  {
+    c: 't1',
+    name: 'temp1: Pious Reflections',
+    args: ['/home/user/0das/1/Alphonsianum/Pious Reflections/', 'das-junk']
+  }, {
+    c: 't2',
+    name: 'temp2: Preparation for Death',
+    args: ['/home/user/0das/1/Alphonsianum/Preparation for Death/', 'das-junk']
+  }, {
+    c: 't3',
+    name: 'temp3: Gildersleeve',
+    args: ['/home/user/0das/pdf/Latin/Gildersleeve/', 'das-junk']
+  }, {
+    c: 't4',
+    name: 'temp4: dictionaries',
+    args: ['/home/user/0das/pdf/Latin/dictionaries/', 'das-junk']
+  }, {
+    c: 't5',
+    name: 'super temp',
+    args: ['/home/user/0das/temp/das-junk/', 'das-junk']
+  }, {
+    c: '1',
+    name: 'archive: ~/0das/1/',
+    args: ['/home/user/0das/1/', 'das-1-docs']
+  }, {
+    c: 'p',
+    name: 'archive: ~/0das/pdf/',
+    args: ['/home/user/0das/pdf/', 'das-pdf']
+  }, {
+    c: 'w',
+    name: 'archive: ~/www/',
+    args: ['/home/user/www/', 'das-www']
+  }, {
+    c: 'z',
+    name: 'archive: ~/0das/zprogs/',
+    args: ['/home/user/0das/zprogs/', 'das-zprogs']
+  }
+];
 let srv, gchrome;
 
 async function main() {
@@ -41,16 +56,15 @@ async function main() {
     fn = sync;
     s3.simpleS3Queue();
     fnDone = () => { process.exit(); };
-  }
-  else if (flag('d')) fn = s3.download;
+  } else if (flag('d')) fn = s3.download;
   else if (flag('s')) fn = s3.status;
   else {
-    srv = web.new();
+    srv = web.new({ port: 14032 });
     await srv
       .addHandler(/tmp\/(.*)/, web.modFiles(1))
       .addHandler(true, web.files)
       .start();
-    //or xdg-open?
+    // or xdg-open?
     if (flag('g')) {
       gchrome = exec(`google-chrome --app=http://${srv.host}:${srv.port}/ux.html`);
       gchrome.stdout.pipe(process.stdout);
@@ -62,7 +76,7 @@ async function main() {
   for (let d of dirs) {
     if (flag(d.c)) {
       console.log('starting ', d.name);
-      await fn.apply(null, d.args)
+      await fn.apply(null, d.args);
     }
   }
   s3.printQueue();
@@ -86,12 +100,14 @@ function s3Socket(srv) {
       s3.actionQueue(p, true));
 
   let inProgress = false;
-  for (var d of dirs) srv.jh.addCbJson(d.name, async o => {
-    if (inProgress) console.log('*** reject, another sync is in progress', d.name);
-    inProgress = true;
-    await sync.apply(null, o.args);
-    inProgress = false;
-  });
+  for (var d of dirs) {
+    srv.jh.addCbJson(d.name, async o => {
+      if (inProgress) console.log('*** reject, another sync is in progress', d.name);
+      inProgress = true;
+      await sync.apply(null, o.args);
+      inProgress = false;
+    });
+  }
 
   /************************************************************************/
   // websocket s3 sends:
@@ -111,7 +127,6 @@ function s3Socket(srv) {
     srv.jh.sendJson(s3.ev.file_end, f));
 
   /************************************************************************/
-
 }
 
 process.stdin.setEncoding('utf8');
@@ -131,4 +146,3 @@ const onExit = () => {
 process.on('exit', onExit);
 process.on('SIGTERM', () => process.exit(1));
 process.on('SIGINT', () => process.exit(1));
-

@@ -1,35 +1,37 @@
-const { S3 } = require('aws-sdk'),
-  $path = require('path'),
-  pj = $path.join,
-  fs = require('./fs-promise'),
-  EventEmitter = require('events'),
-  emitter = new EventEmitter(),
-  ev = {
-    end: 'end',
-    file_all: 'file_all',
-    file_comp_done: 'file_comp_done',
-    file_dq: 'file_dq',
-    file_end: 'file_end',
-    file_eq: 'file_eq',
-    file_list_done: 'file_list_done',
-    file_q: 'file_q',
-    file_skip: 'file_skip',
-    file_start: 'file_start',
-    file_unused: 'file_unused',
-    file_del: 'file_del',
-    get_remote: 'fetch_remote',
-    progress: 'progress',
-    stats: 'stats',
-  },
-  sleep = ms => new Promise(res => setTimeout(res, ms)),
-  psmb = 8,
-  logger = {
-    log: console.log,
-    write: x => { process.stdout.write(x); },
-    _buf: '',
-    queue: x => logger._buf += x + '\n',
-    pq: () => console.log(logger._buf)
-  };
+/* eslint-disable no-unused-vars, promise/param-names */
+/* eslint-disable no-return-assign */
+const { S3 } = require('aws-sdk');
+const $path = require('path');
+const pj = $path.join;
+const fs = require('./fs-promise');
+const EventEmitter = require('events');
+const emitter = new EventEmitter();
+const ev = {
+  end: 'end',
+  file_all: 'file_all',
+  file_comp_done: 'file_comp_done',
+  file_dq: 'file_dq',
+  file_end: 'file_end',
+  file_eq: 'file_eq',
+  file_list_done: 'file_list_done',
+  file_q: 'file_q',
+  file_skip: 'file_skip',
+  file_start: 'file_start',
+  file_unused: 'file_unused',
+  file_del: 'file_del',
+  get_remote: 'fetch_remote',
+  progress: 'progress',
+  stats: 'stats'
+};
+const sleep = ms => new Promise(res => setTimeout(res, ms));
+const psmb = 8;
+const logger = {
+  log: console.log,
+  write: x => { process.stdout.write(x); },
+  _buf: '',
+  queue: x => logger._buf += x + '\n',
+  pq: () => console.log(logger._buf)
+};
 
 const s3 = new S3();
 // comma separated number
@@ -50,12 +52,16 @@ async function getRemote(bucket, lpath) {
   logger.write(`loading ${bucket}:`);
   const files = new Map();
   function addR(arr) {
-    for (q of arr) {
-      //if (/-/.test(q.ETag)) logger.log(q.Key, q.Size, q.ETag);
+    for (let q of arr) {
+      // if (/-/.test(q.ETag)) logger.log(q.Key, q.Size, q.ETag);
       files.set(q.Key, {
-        key: q.Key, size: q.Size, bucket,
+        key: q.Key,
+        size: q.Size,
+        bucket,
         etag: q.ETag.replace(/"/g, ''),
-        path: pj(lpath, q.Key), isS3: true, eq: -1
+        path: pj(lpath, q.Key),
+        isS3: true,
+        eq: -1
       });
     }
     emitter.emit(ev.get_remote, { length: files.size, done: false });
@@ -84,8 +90,7 @@ async function s3Equal(lstat, s3map) {
   lstat.s3 = rstat;
   if (lstat.size !== rstat.size) { return lstat.eq = 2; }
   let letag = await lstat.etag(psmb);
-  if (letag !== rstat.etag) { return lstat.eq = 3; }
-  else return lstat.eq = 0;
+  if (letag !== rstat.etag) { return lstat.eq = 3; } else return lstat.eq = 0;
 }
 
 async function sync(path, bucket, filters) {
@@ -117,8 +122,8 @@ async function sync(path, bucket, filters) {
   await Promise.all(aprs);
   emitter.emit(ev.file_comp_done, path);
 
-  let unused = Array.from(s3config.map.values()).filter(x => !x.used),
-    unusedcnt = unused.length;
+  let unused = Array.from(s3config.map.values()).filter(x => !x.used);
+  let unusedcnt = unused.length;
   emitter.emit(ev.file_unused, { path, cnt: unusedcnt, files: unused.slice() });
 
   let retval = true;
@@ -135,8 +140,8 @@ async function sync(path, bucket, filters) {
 const statPrint = s => csn(s.len) + '/' + csn(s.size);
 let statReset, statObject;
 function StatsEvents() {
-  let all, done, skip, eq, q, active, del
-    , lastStat = 0, pendStat = false;
+  let all; let done; let skip; let eq; let q; let active; let del
+    ; let lastStat = 0; let pendStat = false;
   const
     emitStat = () => {
       if (!lastStat) {
@@ -145,25 +150,25 @@ function StatsEvents() {
         lastStat++;
         setTimeout(() => { lastStat = 0; if (pendStat) emitStat(); }, 200);
       } else pendStat = true;
-    }
-    , stat = o => Object.assign({ len: 0, size: 0 }, o),
-    arem = (a, o) => {
-      let i = a.indexOf(o);
-      if (i >= 0) a.splice(i, 1);
-    },
-    op = (s, files, o = 1) => {
-      if (!Array.isArray(files)) files = [files];
-      o = o < 0 ? -1 : 1;
-      for (let f of files) {
-        s.len += o;
-        s.size += o * f.size;
-        if ('files' in s) {
-          if (o < 0) arem(s.files, f);
-          else s.files.push(f);
-        }
+    };
+  const stat = o => Object.assign({ len: 0, size: 0 }, o);
+  const arem = (a, o) => {
+    let i = a.indexOf(o);
+    if (i >= 0) a.splice(i, 1);
+  };
+  const op = (s, files, o = 1) => {
+    if (!Array.isArray(files)) files = [files];
+    o = o < 0 ? -1 : 1;
+    for (let f of files) {
+      s.len += o;
+      s.size += o * f.size;
+      if ('files' in s) {
+        if (o < 0) arem(s.files, f);
+        else s.files.push(f);
       }
-      emitStat();
-    }, sp = statPrint;
+    }
+    emitStat();
+  }; const sp = statPrint;
   statReset = () => {
     all = stat(); done = stat(); skip = stat(); eq = stat();
     q = stat(); active = stat({ files: [] }); del = stat({ files: [] });
@@ -175,7 +180,7 @@ function StatsEvents() {
   emitter.on(ev.file_eq, f => op(eq, f));
   emitter.on(ev.file_q, f => op(q, f));
   emitter.on(ev.file_dq, f => op(q, f, -1));
-  //emitter.on(ev.file_start, f => op(done, f));
+  // emitter.on(ev.file_start, f => op(done, f));
   emitter.on(ev.file_end, f => op(done, f));
   emitter.on(ev.file_list_done, path => {
     emitter.emit(ev.progress, {
@@ -219,16 +224,16 @@ function consoleEmitters() {
 /******************************************************************************/
 let finishQueue = null;
 function simpleS3Queue() {
-  let upcnt = 0, queue = [], compDone = false,
-    handleQ = s => {
-      if (s) queue.push(s);
-      if (upcnt < 20 && queue.length) {
-        let up = queue.pop();
-        emitter.emit(ev.file_dq, up);
-        upcnt++;
-        qprs.push(s3Upload(up));
-      }
-    }, qprs = [];;
+  let upcnt = 0; let queue = []; let compDone = false;
+  let handleQ = s => {
+    if (s) queue.push(s);
+    if (upcnt < 20 && queue.length) {
+      let up = queue.pop();
+      emitter.emit(ev.file_dq, up);
+      upcnt++;
+      qprs.push(s3Upload(up));
+    }
+  }; let qprs = []; ;
   emitter.on(ev.file_comp_done, x => compDone = true);
   emitter.on(ev.file_q, s => handleQ(s));
   emitter.on(ev.file_end, s => {
@@ -236,6 +241,7 @@ function simpleS3Queue() {
     handleQ();
   });
   finishQueue = async (unused, path) => {
+    /* eslint-disable-next-line no-unmodified-loop-condition */
     while (!compDone || upcnt || queue.length) {
       await Promise.all(qprs);
     };
@@ -249,21 +255,23 @@ function simpleS3Queue() {
       logger.write('.');
     }
     return true;
-  }
+  };
 }
 
 const s3Upload = (stat) => {
   stat.dt0 = Date.now();
   emitter.emit(ev.file_start, stat);
 
-  let pr = s3.upload({
+  let s3up = s3.upload({
     Bucket: stat.bucket,
     Key: stat.key,
-    Body: fs.createReadStream(stat.path),
-  }, { partSize: psmb * 1024 * 1024 }).promise();
-  pr = pr.then(x => {
+    Body: fs.createReadStream(stat.path)
+  }, { partSize: psmb * 1024 * 1024 });
+  let pr = s3up.promise().then(x => {
     emitter.emit(ev.file_end, stat);
   });
+  pr.stat = stat;
+  pr.abort = () => s3up.abort();
   return pr;
 };
 
@@ -276,7 +284,7 @@ const s3Download = (stat) => new Promise((resolve, reject) => {
 
   const s3stream = s3.getObject({
     Bucket: stat.bucket,
-    Key: stat.key,
+    Key: stat.key
   }).createReadStream();
   s3stream.on('error', e => reject(e));
   s3stream.on('finish', () => {
@@ -300,37 +308,36 @@ const localDelete = async (stat) => {
 const takeAction = async (stat, withDels = false) => {
   if (!stat.action) return;
   if (stat.isLocal) {
-    if (stat.action === 1) { return s3Upload(stat); }
-    else if (stat.action === -1) {
-      if (stat.s3) { return s3Download(stat); }
-      else if (withDels) { return localDelete(stat); }
+    if (stat.action === 1) { return s3Upload(stat); } else if (stat.action === -1) {
+      if (stat.s3) { return s3Download(stat); } else if (withDels) { return localDelete(stat); }
     }
   } else if (stat.isS3) {
+    /* eslint-disable-next-line brace-style */
     if (stat.action === -1) { return s3Download(stat); }
     else if (stat.action === 1 && withDels) { return s3Delete(stat); }
   }
 };
 
 let acnt = 0;
-const aq = [], aprs = [], amax = 20
-  , enq = (s, withDels) => {
-    if (s) {
-      aq.push(s);
-      //emitter.emit(ev.file_q, s);
-    }
-    if (acnt < amax && aq.length) {
-      const up = aq.shift();
-      //emitter.emit(ev.file_dq, up);
-      acnt++;
-      let pr = takeAction(up, withDels).then(x => {
-        acnt--; enq(null, withDels);
-      });
-      aprs.push(pr);
-    };
+const aq = []; const aprs = []; const amax = 20
+  ; const enq = (s, withDels) => {
+  if (s) {
+    aq.push(s);
+    // emitter.emit(ev.file_q, s);
+  }
+  if (acnt < amax && aq.length) {
+    const up = aq.shift();
+    // emitter.emit(ev.file_dq, up);
+    acnt++;
+    let pr = takeAction(up, withDels).then(x => {
+      acnt--; enq(null, withDels);
+    });
+    aprs.push(pr);
   };
+};
 const actionQueue = async (arr, withDels) => {
   if (arr instanceof Array) arr.map(s => enq(s, withDels));
-  else enq(s, withDels);
+  else enq(arr, withDels);
   await Promise.all(aprs);
 };
 
@@ -342,7 +349,7 @@ async function getVersions(bucket) {
   logger.write(`loading ${bucket}:`);
   const files = new Map();
   function addR(arr, isDel) {
-    for (q of arr) {
+    for (let q of arr) {
       if (isDel) q.Delete = true;
       delete q.Owner;
       delete q.StorageClass;
@@ -384,9 +391,13 @@ async function status(path, bucket) {
 /******************************************************************************/
 
 module.exports = {
-  sync, status,
+  sync,
+  status,
   printQueue: logger.pq,
   on: (name, ...a) => emitter.on(name, ...a),
   once: (name, ...a) => emitter.once(name, ...a),
-  consoleEmitters, simpleS3Queue, ev, actionQueue
+  consoleEmitters,
+  simpleS3Queue,
+  ev,
+  actionQueue
 };

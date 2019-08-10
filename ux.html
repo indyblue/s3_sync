@@ -3,12 +3,14 @@
 <html>
 
 <head>
-	<meta http-equiv="Content-Type" content="text/html;charset=ISO-8859-1">
+	<meta http-equiv="Content-Type"
+		content="text/html;charset=ISO-8859-1">
 	<title>S3 Sync</title>
 	<script type="text/javascript" src='/tmp/poly-map.js'></script>
 	<script type="text/javascript" src='/tmp/ttools.js'></script>
 	<script type="text/javascript" src='/tmp/templar.js'></script>
-	<script type="text/javascript" src='/tmp/json_websocket.js'></script>
+	<script type="text/javascript"
+		src='/tmp/json_websocket.js'></script>
 	<link href="/styles.css" rel="stylesheet">
 	<style>
 	</style>
@@ -42,26 +44,37 @@
 				<div x-model-s='model.fetch'>fetch:
 					<s>{{s.length}}</s> done: <s>{{s.done}}</s>
 				</div>
-				<div>Done: <s x-tmp='#stat' x-model-s='model.stats.done'></s></div>
+				<div>Done: <s x-tmp='#stat' x-model-s='model.stats.done'></s>
+				</div>
 				<br />
-				<div>Local/Both: <s x-tmp='#stat' x-model-s='model.stats.q'></s></div>
-				<div>S3 only: <s x-tmp='#stat' x-model-s='model.stats.del'></s></div>
+				<div>Local/Both: <s x-tmp='#stat'
+						x-model-s='model.stats.q'></s></div>
+				<div>S3 only: <s x-tmp='#stat'
+						x-model-s='model.stats.del'></s></div>
 				<br />
-				<div>Equal: <s x-tmp='#stat' x-model-s='model.stats.eq'></s></div>
-				<div>Skip: <s x-tmp='#stat' x-model-s='model.stats.skip'></s></div>
-				<div>All: <s x-tmp='#stat' x-model-s='model.stats.all'></s></div>
+				<div>Equal: <s x-tmp='#stat' x-model-s='model.stats.eq'></s>
+				</div>
+				<div>Skip: <s x-tmp='#stat' x-model-s='model.stats.skip'></s>
+				</div>
+				<div>All: <s x-tmp='#stat' x-model-s='model.stats.all'></s>
+				</div>
 				<br />
 			</div> <br />
 
 			<!-- ***** filters *************************************************** -->
 			<fr x-model-f='model.filter'>
-				<fs><input value-bind value="{{f.q}}" />
+				<fs>
+					<input value-bind value="{{f.q}}" />
+					<s x-tmp='#filter-checkbox' x-setc-chkf='invert'></s>
 					<button on-click="{{ist.recalc}}">Filter</button></fs>
 				<fg>&nbsp;</fg>
 				<fs>
-					<button x-setcu-dir='-1' on-click='{{actionClick}}'>Down</button>
-					<button x-setcu-dir='0' on-click='{{actionClick}}'>Nothing</button>
-					<button x-setcu-dir='1' on-click='{{actionClick}}'>Up</button>
+					<button x-setcu-dir='-1'
+						on-click='{{actionClick}}'>Down</button>
+					<button x-setcu-dir='0'
+						on-click='{{actionClick}}'>Nothing</button>
+					<button x-setcu-dir='1'
+						on-click='{{actionClick}}'>Up</button>
 					&nbsp;
 				</fs>
 				<fs>
@@ -73,7 +86,8 @@
 
 			<fc queue x-tmp='#queue' x-repeat-q='model.queue'></fc>
 			<br /><br /><b>Completed Items:</b>
-			<fc id='fcompl' queue x-tmp='#queue' x-repeat-q='model.fcompl'></fc>
+			<fc id='fcompl' queue x-tmp='#queue' x-repeat-q='model.fcompl'>
+			</fc>
 		</template>
 
 		<template id='stat'><s x-model-s'>
@@ -83,7 +97,9 @@
 		<template id='queue'>
 			<fr x-model-q' class="{{q.eq.*eqTxt}} {{q.*qFilter}}">
 				<fs>{{q.action.*actionTxt}} &nbsp;</fs>
-				<fg><span>{{q.key}}</span><div>{{q.dt0.*fmtActive}}</div></fg>
+				<fg><span>{{q.key}}</span>
+					<div>{{q.dt0.*fmtActive}}</div>
+				</fg>
 				<fs>
 					<b>{{q.eq.*eqTxt}}</b> - <s>{{q.size.*csn}}</s>
 				</fs>
@@ -91,8 +107,9 @@
 		</template>
 
 		<template id='filter-checkbox'>
-			<input type='checkbox' checked='{{f.*chkf}}' id='chf-{{f.@*chkf}}'
-			 on-click="{?{ qq('f.*chkf', this.checked); ctx.ist.recalc(); }}" />
+			<input type='checkbox' checked='{{f.*chkf}}'
+				id='chf-{{f.@*chkf}}'
+				on-click="{?{ qq('f.*chkf', this.checked); ctx.ist.recalc(); }}" />
 			<label for='chf-{{f.@*chkf}}'>{{f.@*chkf}}</label>
 		</template>
 	</div>
@@ -113,14 +130,17 @@
 			else return '';
 		}
 		function qFilter(o, p, ctx, key, spath, qq) {
-			if(!o) return '';
+			if (!o) return '';
 			var qtxt = qq('model.filter.q')
 				, clocal = qq('model.filter.local')
 				, cs3 = qq('model.filter.s3')
-				, cboth = qq('model.filter.both');
+				, cboth = qq('model.filter.both')
+				, inv = qq('model.filter.invert');
+			console.log('invert', inv);
 			var rx = new RegExp(qtxt, 'i');
 			var show = true;
 			if (!rx.test(o.key)) show &= false;
+			if (inv) show = !show;
 			if (!clocal && o.eq === 1) show &= false;
 			if (!cs3 && o.eq < 0) show &= false;
 			if (!cboth && o.eq > 1) show &= false;
@@ -155,7 +175,7 @@
 			if (!dt0) return '';
 			var ival = 500, ms = Date.now() - dt0, secs = Math.floor(ms / 1000),
 				len = Math.round((ms / ival) % 50);
-			setTimeout(function () { ctx.ist.recalc(); }, ival);
+			setTimeout(function() { ctx.ist.recalc(); }, ival);
 			return secs + ('='.repeat(len)) + '>';
 		}
 	</script>
@@ -165,7 +185,7 @@
 		var data = {
 			queue: [],
 			fcompl: [],
-			filter: { q: '', local: true, s3: true, both: true },
+			filter: { q: '', invert:false, local: true, s3: true, both: true },
 			timer: {}
 		};
 		var ctx = {
@@ -185,16 +205,16 @@
 
 	<script> /***** websockets **************************************************/
 		'use strict';
-		(function () {
+		(function() {
 			var jh = window.jsonWsHandler;
 
 			console.log('ws://' + window.location.host + '/');
 			var ws = new WebSocket('ws://' + window.location.host + '/');
-			ws.onopen = function () {
+			ws.onopen = function() {
 				jh.addConn(ws);
 				ws.onmessage = jh.ondata;
 			};
-			ws.onclose = function () { jh.remConn(ws); };
+			ws.onclose = function() { jh.remConn(ws); };
 		})();
 	</script>
 
@@ -210,36 +230,36 @@
 			tmp.model.dirs = obj.dirs;
 			tmp.recalc();
 			window.jsonWsHandler
-				.addCbJson(ev.stats, function (s, e) {
+				.addCbJson(ev.stats, function(s, e) {
 					tmp.model.stats = s;
 					tmp.recalc();
 				})
-				.addCbJson(ev.file_q, function (s, e) {
+				.addCbJson(ev.file_q, function(s, e) {
 					tmp.model.queue.push(s);
 					tmp.recalc();
 				})
-				.addCbJson(ev.get_remote, function (s, e) {
+				.addCbJson(ev.get_remote, function(s, e) {
 					tmp.model.fetch = s;
 					tmp.recalc();
 				})
-				.addCbJson(ev.file_unused, function (s, e) {
+				.addCbJson(ev.file_unused, function(s, e) {
 					Array.prototype.push.apply(tmp.model.queue, s.files);
 					tmp.recalc();
 				})
-				.addCbJson(ev.file_start, function (s, e) {
+				.addCbJson(ev.file_start, function(s, e) {
 					var i = tmp.model.queue.findIndex(x => x.key == s.key);
 					if (1 < 0) tmp.model.queue.push(s);
 					else Object.assign(tmp.model.queue[i], s);
 					tmp.recalc();
 				})
-				.addCbJson(ev.file_end, function (s, e) {
+				.addCbJson(ev.file_end, function(s, e) {
 					var i = tmp.model.queue.findIndex(x => x.key == s.key);
 					if (1 >= 0) tmp.model.queue.splice(i, 1);
 					delete s.dt0;
 					tmp.model.fcompl.push(s);
 					tmp.recalc();
 				})
-				.addCbJson(ev.end, function (s, e) {
+				.addCbJson(ev.end, function(s, e) {
 					tmp.model.complete = 'scan complete';
 					console.log(s);
 					tmp.model.timer.start = s.dt0;
