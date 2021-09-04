@@ -5,13 +5,26 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack",
+    "lint": "eslint *.js etc/*.js",
+    "fix": "eslint *.js etc/*.js --fix"
   },
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.29.0",
     "aws-sdk": "^2.307.0",
     "fs-extra": "^7.0.1",
+    "immutability-helper": "^3.1.1",
+    "preact": "^10.5.5",
     "template.das": "file:../my_modules/template.das"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.12.3",
+    "@babel/preset-env": "^7.12.1",
+    "babel-loader": "^8.1.0",
+    "webpack": "^5.4.0",
+    "webpack-cli": "^4.2.0"
   }
 }

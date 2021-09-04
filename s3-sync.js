@@ -1,6 +1,11 @@
 /* eslint-disable no-unused-vars, promise/param-names */
 /* eslint-disable no-return-assign */
 const { S3 } = require('aws-sdk');
+const s3 = new S3();
+
+const { S3: S3v3 } = require('@aws-sdk/client-s3');
+const s3v3 = new S3v3({ region: 'us-east-2' });
+
 const $path = require('path');
 const pj = $path.join;
 const fs = require('./fs-promise');
@@ -21,7 +26,7 @@ const ev = {
   file_del: 'file_del',
   get_remote: 'fetch_remote',
   progress: 'progress',
-  stats: 'stats'
+  stats: 'stats',
 };
 const sleep = ms => new Promise(res => setTimeout(res, ms));
 const psmb = 8;
@@ -30,17 +35,16 @@ const logger = {
   write: x => { process.stdout.write(x); },
   _buf: '',
   queue: x => logger._buf += x + '\n',
-  pq: () => console.log(logger._buf)
+  pq: () => console.log(logger._buf),
 };
 
-const s3 = new S3();
 // comma separated number
-const csn = n => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+const csn = n => n?.toString()?.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
 // file filter check - string(contains), regexp(test), function(return true)
 const chkFilter = (stat, filters) => {
   if (!filters || !Array.isArray(filters)) return false;
-  for (let f of filters) {
+  for (const f of filters) {
     if (f instanceof RegExp && f.test(stat.key)) return true;
     else if (typeof f === 'string' && stat.key.indexOf(f) >= 0) return true;
     else if (typeof f === 'function' && f(stat.key) === true) return true;
@@ -52,7 +56,7 @@ async function getRemote(bucket, lpath) {
   logger.write(`loading ${bucket}:`);
   const files = new Map();
   function addR(arr) {
-    for (let q of arr) {
+    for (const q of arr) {
       // if (/-/.test(q.ETag)) logger.log(q.Key, q.Size, q.ETag);
       files.set(q.Key, {
         key: q.Key,
@@ -61,14 +65,25 @@ async function getRemote(bucket, lpath) {
         etag: q.ETag.replace(/"/g, ''),
         path: pj(lpath, q.Key),
         isS3: true,
-        eq: -1
+        eq: -1,
       });
     }
     emitter.emit(ev.get_remote, { length: files.size, done: false });
   }
-  var objs = await s3.listObjects({
+  let resp;
+  do {
+    resp = await s3v3.listObjectsV2({
+      Bucket: bucket,
+      ContinuationToken: resp?.NextContinuationToken,
+    });
+    addR(resp.Contents);
+    logger.write('.');
+  } while (resp.NextContinuationToken);
+
+  /*
+  const objs = await s3.listObjects({
     Bucket: bucket,
-    MaxKeys: 1000
+    MaxKeys: 1000,
   }).promise();
   let np = objs;
   addR(np.Contents);
@@ -78,6 +93,7 @@ async function getRemote(bucket, lpath) {
     addR(np.Contents);
     logger.write('.');
   }
+  */
   logger.write('done\n');
   emitter.emit(ev.get_remote, { length: files.size, done: true });
   return files;
@@ -85,11 +101,11 @@ async function getRemote(bucket, lpath) {
 
 async function s3Equal(lstat, s3map) {
   if (!s3map.has(lstat.key)) { return lstat.eq = 1; }
-  let rstat = s3map.get(lstat.key);
+  const rstat = s3map.get(lstat.key);
   rstat.used = true;
   lstat.s3 = rstat;
   if (lstat.size !== rstat.size) { return lstat.eq = 2; }
-  let letag = await lstat.etag(psmb);
+  const letag = await lstat.etag(psmb);
   if (letag !== rstat.etag) { return lstat.eq = 3; } else return lstat.eq = 0;
 }
 
@@ -100,10 +116,10 @@ async function sync(path, bucket, filters) {
 
   s3config.map = await getRemote(s3config.bucket, path);
 
-  let aprs = [];
+  const aprs = [];
   emitter.emit(ev.progress, { status: 'start', path });
   const objs = await fs.deepstats('', path, stats => {
-    for (let s of stats) {
+    for (const s of stats) {
       if (s.isDir || !s.isFile || s.size === 0
         || chkFilter(s, filters)) {
         emitter.emit(ev.file_skip, s);
@@ -111,7 +127,7 @@ async function sync(path, bucket, filters) {
       }
       emitter.emit(ev.file_all, s);
       s.bucket = bucket;
-      let pr = s3Equal(s, s3config.map).then(status => {
+      const pr = s3Equal(s, s3config.map).then(status => {
         if (status === 0) emitter.emit(ev.file_eq, s);
         else emitter.emit(ev.file_q, s);
       });
@@ -122,8 +138,8 @@ async function sync(path, bucket, filters) {
   await Promise.all(aprs);
   emitter.emit(ev.file_comp_done, path);
 
-  let unused = Array.from(s3config.map.values()).filter(x => !x.used);
-  let unusedcnt = unused.length;
+  const unused = Array.from(s3config.map.values()).filter(x => !x.used);
+  const unusedcnt = unused.length;
   emitter.emit(ev.file_unused, { path, cnt: unusedcnt, files: unused.slice() });
 
   let retval = true;
@@ -153,13 +169,13 @@ function StatsEvents() {
     };
   const stat = o => Object.assign({ len: 0, size: 0 }, o);
   const arem = (a, o) => {
-    let i = a.indexOf(o);
+    const i = a.indexOf(o);
     if (i >= 0) a.splice(i, 1);
   };
   const op = (s, files, o = 1) => {
     if (!Array.isArray(files)) files = [files];
     o = o < 0 ? -1 : 1;
-    for (let f of files) {
+    for (const f of files) {
       s.len += o;
       s.size += o * f.size;
       if ('files' in s) {
@@ -185,7 +201,7 @@ function StatsEvents() {
   emitter.on(ev.file_list_done, path => {
     emitter.emit(ev.progress, {
       status: `file list done ${sp(all)}`,
-      path
+      path,
     });
   });
   emitter.on(ev.file_comp_done, path => {
@@ -224,16 +240,17 @@ function consoleEmitters() {
 /******************************************************************************/
 let finishQueue = null;
 function simpleS3Queue() {
-  let upcnt = 0; let queue = []; let compDone = false;
-  let handleQ = s => {
+  let upcnt = 0; const queue = []; let compDone = false;
+  const handleQ = s => {
     if (s) queue.push(s);
     if (upcnt < 20 && queue.length) {
-      let up = queue.pop();
+      const up = queue.pop();
       emitter.emit(ev.file_dq, up);
       upcnt++;
       qprs.push(s3Upload(up));
     }
-  }; let qprs = []; ;
+  };
+  const qprs = [];
   emitter.on(ev.file_comp_done, x => compDone = true);
   emitter.on(ev.file_q, s => handleQ(s));
   emitter.on(ev.file_end, s => {
@@ -248,8 +265,8 @@ function simpleS3Queue() {
 
     const dels = unused;
     while (dels.length) {
-      let dbatch = dels.splice(0, 40);
-      let dprs = dbatch.map(x => s3Delete(x));
+      const dbatch = dels.splice(0, 40);
+      const dprs = dbatch.map(x => s3Delete(x));
       await Promise.all(dprs);
       emitter.emit(ev.file_del, { status: 'batch', files: dbatch });
       logger.write('.');
@@ -258,16 +275,16 @@ function simpleS3Queue() {
   };
 }
 
-const s3Upload = (stat) => {
+const s3Upload = stat => {
   stat.dt0 = Date.now();
   emitter.emit(ev.file_start, stat);
 
-  let s3up = s3.upload({
+  const s3up = s3.upload({
     Bucket: stat.bucket,
     Key: stat.key,
-    Body: fs.createReadStream(stat.path)
+    Body: fs.createReadStream(stat.path),
   }, { partSize: psmb * 1024 * 1024 });
-  let pr = s3up.promise().then(x => {
+  const pr = s3up.promise().then(x => {
     emitter.emit(ev.file_end, stat);
   });
   pr.stat = stat;
@@ -275,16 +292,16 @@ const s3Upload = (stat) => {
   return pr;
 };
 
-const s3Download = (stat) => new Promise((resolve, reject) => {
+const s3Download = stat => new Promise((resolve, reject) => {
   stat.dt0 = Date.now();
   emitter.emit(ev.file_start, stat);
 
   fs.ensureFileSync(stat.path);
-  var fileStream = fs.createWriteStream(stat.path);
+  const fileStream = fs.createWriteStream(stat.path);
 
   const s3stream = s3.getObject({
     Bucket: stat.bucket,
-    Key: stat.key
+    Key: stat.key,
   }).createReadStream();
   s3stream.on('error', e => reject(e));
   s3stream.on('finish', () => {
@@ -294,13 +311,13 @@ const s3Download = (stat) => new Promise((resolve, reject) => {
   s3stream.pipe(fileStream);
 });
 
-const s3Delete = (stat) => s3.deleteObject({
+const s3Delete = stat => s3.deleteObject({
   Bucket: stat.bucket,
-  Key: stat.key
+  Key: stat.key,
 }).promise()
   .then(x => emitter.emit(ev.file_end, stat));
 
-const localDelete = async (stat) => {
+const localDelete = async stat => {
   fs.unlinkSync(stat.path);
   emitter.emit(ev.file_end, stat);
 };
@@ -319,8 +336,8 @@ const takeAction = async (stat, withDels = false) => {
 };
 
 let acnt = 0;
-const aq = []; const aprs = []; const amax = 20
-  ; const enq = (s, withDels) => {
+const aq = []; const aprs = []; const amax = 5; // 20;
+const enq = (s, withDels) => {
   if (s) {
     aq.push(s);
     // emitter.emit(ev.file_q, s);
@@ -329,7 +346,7 @@ const aq = []; const aprs = []; const amax = 20
     const up = aq.shift();
     // emitter.emit(ev.file_dq, up);
     acnt++;
-    let pr = takeAction(up, withDels).then(x => {
+    const pr = takeAction(up, withDels).then(x => {
       acnt--; enq(null, withDels);
     });
     aprs.push(pr);
@@ -349,21 +366,21 @@ async function getVersions(bucket) {
   logger.write(`loading ${bucket}:`);
   const files = new Map();
   function addR(arr, isDel) {
-    for (let q of arr) {
+    for (const q of arr) {
       if (isDel) q.Delete = true;
       delete q.Owner;
       delete q.StorageClass;
       if (files.has(q.Key)) {
-        let val = files.get(q.Key);
+        const val = files.get(q.Key);
         val.objs.push(q);
       } else {
         files.set(q.Key, { key: q.Key, objs: [q] });
       }
     }
   }
-  var objs = await s3.listObjectVersions({
+  const objs = await s3.listObjectVersions({
     Bucket: bucket,
-    MaxKeys: 1000
+    MaxKeys: 1000,
   }).promise();
   let np = objs;
   addR(np.DeleteMarkers, 1);
@@ -384,7 +401,7 @@ async function status(path, bucket) {
   const s3config = { bucket: bucket, dry: false };
 
   s3config.map = await getVersions(s3config.bucket);
-  let multi = Array.from(s3config.map.values()).filter(x => x.objs.length > 1);
+  const multi = Array.from(s3config.map.values()).filter(x => x.objs.length > 1);
   console.log(multi.length);
   console.log(JSON.stringify(multi, null, 2));
 }
@@ -399,5 +416,5 @@ module.exports = {
   consoleEmitters,
   simpleS3Queue,
   ev,
-  actionQueue
+  actionQueue,
 };

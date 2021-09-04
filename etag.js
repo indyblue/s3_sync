@@ -4,12 +4,12 @@ const fs = require('fs');
 
 const etag = (fname, psmb) => new Promise((resolve, reject) => {
   const dt0 = Date.now();
-  let ps = (psmb || 8) * 1024 * 1024; let hashes = []; let pos = 0; let chunk;
+  const ps = (psmb || 8) * 1024 * 1024; const hashes = []; let pos = 0; let chunk;
   let hash = crypto.createHash('md5');
-  let rs = fs.createReadStream(fname);
+  const rs = fs.createReadStream(fname);
 
   rs.on('data', x => {
-    let tail = null; let rnd = ps - (pos % ps); let len = x.length;
+    let tail = null; const rnd = ps - (pos % ps); const len = x.length;
     if (rnd <= len) {
       tail = x.slice(rnd);
       x = x.slice(0, rnd);
@@ -24,8 +24,8 @@ const etag = (fname, psmb) => new Promise((resolve, reject) => {
   });
   rs.on('end', x => {
     rs.close();
-    let trash = crypto.createHash('md5').digest('hex');
-    let last = hash.digest('hex');
+    const trash = crypto.createHash('md5').digest('hex');
+    const last = hash.digest('hex');
     if (last !== trash) hashes.push(last);
     // hashes.map(x => console.log(x));
     if (hashes.length === 1) return resolve(hashes[0]);

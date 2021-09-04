@@ -3,277 +3,277 @@
 <html>
 
 <head>
-	<meta http-equiv="Content-Type"
-		content="text/html;charset=ISO-8859-1">
-	<title>S3 Sync</title>
-	<script type="text/javascript" src='/tmp/poly-map.js'></script>
-	<script type="text/javascript" src='/tmp/ttools.js'></script>
-	<script type="text/javascript" src='/tmp/templar.js'></script>
-	<script type="text/javascript"
-		src='/tmp/json_websocket.js'></script>
-	<link href="/styles.css" rel="stylesheet">
-	<style>
-	</style>
+  <meta http-equiv="Content-Type"
+    content="text/html;charset=ISO-8859-1">
+  <title>S3 Sync</title>
+  <script type="text/javascript" src='/tmp/poly-map.js'></script>
+  <script type="text/javascript" src='/tmp/ttools.js'></script>
+  <script type="text/javascript" src='/tmp/templar.js'></script>
+  <script type="text/javascript"
+    src='/tmp/json_websocket.js'></script>
+  <link href="/styles.css" rel="stylesheet">
+  <style>
+  </style>
 </head>
 
 <body>
 
-	<!-- ***** templates ***************************************************** -->
-	<div>
-		<template id='root'>
-			<div x-repeat-b='model.dirs'>
-				<button on-click='{{dirClick}}'>{{b.name}}</button>
-			</div>
-			<!-- ***** stats ***************************************************** -->
-			<div>
-				<div>Current: <ul>
-						<li>{{model.current.name}}</li>
-						<li>{{model.current.args[0]}}</li>
-						<li>{{model.current.args[1]}}</li>
-					</ul>
-				</div>
-				<br />
-				<button on-click='{{initiateSync}}'>Initiate Sync</button>
-				<div x-model-t='model.timer'>
-					Scan status: <s>{{model.complete}}</s><br />
-					Scan time:
-					<s>{:{qq('t.start') ? csn((qq('t.end')||Date.now()) -
-						qq('t.start')) : ''
-						}}</s>
-				</div>
-				<div x-model-s='model.fetch'>fetch:
-					<s>{{s.length}}</s> done: <s>{{s.done}}</s>
-				</div>
-				<div>Done: <s x-tmp='#stat' x-model-s='model.stats.done'></s>
-				</div>
-				<br />
-				<div>Local/Both: <s x-tmp='#stat'
-						x-model-s='model.stats.q'></s></div>
-				<div>S3 only: <s x-tmp='#stat'
-						x-model-s='model.stats.del'></s></div>
-				<br />
-				<div>Equal: <s x-tmp='#stat' x-model-s='model.stats.eq'></s>
-				</div>
-				<div>Skip: <s x-tmp='#stat' x-model-s='model.stats.skip'></s>
-				</div>
-				<div>All: <s x-tmp='#stat' x-model-s='model.stats.all'></s>
-				</div>
-				<br />
-			</div> <br />
+  <!-- ***** templates ***************************************************** -->
+  <div>
+    <template id='root'>
+      <div x-repeat-b='model.dirs'>
+        <button on-click='{{dirClick}}'>{{b.name}}</button>
+      </div>
+      <!-- ***** stats ***************************************************** -->
+      <div>
+        <div>Current: <ul>
+            <li>{{model.current.name}}</li>
+            <li>{{model.current.args[0]}}</li>
+            <li>{{model.current.args[1]}}</li>
+          </ul>
+        </div>
+        <br />
+        <button on-click='{{initiateSync}}'>Initiate Sync</button>
+        <div x-model-t='model.timer'>
+          Scan status: <s>{{model.complete}}</s><br />
+          Scan time:
+          <s>{:{qq('t.start') ? csn((qq('t.end')||Date.now()) -
+            qq('t.start')) : ''
+            }}</s>
+        </div>
+        <div x-model-s='model.fetch'>fetch:
+          <s>{{s.length}}</s> done: <s>{{s.done}}</s>
+        </div>
+        <div>Done: <s x-tmp='#stat' x-model-s='model.stats.done'></s>
+        </div>
+        <br />
+        <div>Local/Both: <s x-tmp='#stat'
+            x-model-s='model.stats.q'></s></div>
+        <div>S3 only: <s x-tmp='#stat'
+            x-model-s='model.stats.del'></s></div>
+        <br />
+        <div>Equal: <s x-tmp='#stat' x-model-s='model.stats.eq'></s>
+        </div>
+        <div>Skip: <s x-tmp='#stat' x-model-s='model.stats.skip'></s>
+        </div>
+        <div>All: <s x-tmp='#stat' x-model-s='model.stats.all'></s>
+        </div>
+        <br />
+      </div> <br />
 
-			<!-- ***** filters *************************************************** -->
-			<fr x-model-f='model.filter'>
-				<fs>
-					<input value-bind value="{{f.q}}" />
-					<s x-tmp='#filter-checkbox' x-setc-chkf='invert'></s>
-					<button on-click="{{ist.recalc}}">Filter</button></fs>
-				<fg>&nbsp;</fg>
-				<fs>
-					<button x-setcu-dir='-1'
-						on-click='{{actionClick}}'>Down</button>
-					<button x-setcu-dir='0'
-						on-click='{{actionClick}}'>Nothing</button>
-					<button x-setcu-dir='1'
-						on-click='{{actionClick}}'>Up</button>
-					&nbsp;
-				</fs>
-				<fs>
-					<s x-tmp='#filter-checkbox' x-setc-chkf='local'></s>
-					<s x-tmp='#filter-checkbox' x-setc-chkf='both'></s>
-					<s x-tmp='#filter-checkbox' x-setc-chkf='s3'></s>
-				</fs>
-			</fr>
+      <!-- ***** filters *************************************************** -->
+      <fr x-model-f='model.filter'>
+        <fs>
+          <input value-bind value="{{f.q}}" />
+          <s x-tmp='#filter-checkbox' x-setc-chkf='invert'></s>
+          <button on-click="{{ist.recalc}}">Filter</button></fs>
+        <fg>&nbsp;</fg>
+        <fs>
+          <button x-setcu-dir='-1'
+            on-click='{{actionClick}}'>Down</button>
+          <button x-setcu-dir='0'
+            on-click='{{actionClick}}'>Nothing</button>
+          <button x-setcu-dir='1'
+            on-click='{{actionClick}}'>Up</button>
+          &nbsp;
+        </fs>
+        <fs>
+          <s x-tmp='#filter-checkbox' x-setc-chkf='local'></s>
+          <s x-tmp='#filter-checkbox' x-setc-chkf='both'></s>
+          <s x-tmp='#filter-checkbox' x-setc-chkf='s3'></s>
+        </fs>
+      </fr>
 
-			<fc queue x-tmp='#queue' x-repeat-q='model.queue'></fc>
-			<br /><br /><b>Completed Items:</b>
-			<fc id='fcompl' queue x-tmp='#queue' x-repeat-q='model.fcompl'>
-			</fc>
-		</template>
+      <fc queue x-tmp='#queue' x-repeat-q='model.queue'></fc>
+      <br /><br /><b>Completed Items:</b>
+      <fc id='fcompl' queue x-tmp='#queue' x-repeat-q='model.fcompl'>
+      </fc>
+    </template>
 
-		<template id='stat'><s x-model-s'>
-				<s>{{s.len.*csn}}</s> - <s>{{s.size.*csn}}</s>
-			</s></template>
+    <template id='stat'><s x-model-s'>
+        <s>{{s.len.*csn}}</s> - <s>{{s.size.*csn}}</s>
+      </s></template>
 
-		<template id='queue'>
-			<fr x-model-q' class="{{q.eq.*eqTxt}} {{q.*qFilter}}">
-				<fs>{{q.action.*actionTxt}} &nbsp;</fs>
-				<fg><span>{{q.key}}</span>
-					<div>{{q.dt0.*fmtActive}}</div>
-				</fg>
-				<fs>
-					<b>{{q.eq.*eqTxt}}</b> - <s>{{q.size.*csn}}</s>
-				</fs>
-			</fr>
-		</template>
+    <template id='queue'>
+      <fr x-model-q' class="{{q.eq.*eqTxt}} {{q.*qFilter}}">
+        <fs>{{q.action.*actionTxt}} &nbsp;</fs>
+        <fg><span>{{q.key}}</span>
+          <div>{{q.dt0.*fmtActive}}</div>
+        </fg>
+        <fs>
+          <b>{{q.eq.*eqTxt}}</b> - <s>{{q.size.*csn}}</s>
+        </fs>
+      </fr>
+    </template>
 
-		<template id='filter-checkbox'>
-			<input type='checkbox' checked='{{f.*chkf}}'
-				id='chf-{{f.@*chkf}}'
-				on-click="{?{ qq('f.*chkf', this.checked); ctx.ist.recalc(); }}" />
-			<label for='chf-{{f.@*chkf}}'>{{f.@*chkf}}</label>
-		</template>
-	</div>
+    <template id='filter-checkbox'>
+      <input type='checkbox' checked='{{f.*chkf}}'
+        id='chf-{{f.@*chkf}}'
+        on-click="{?{ qq('f.*chkf', this.checked); ctx.ist.recalc(); }}" />
+      <label for='chf-{{f.@*chkf}}'>{{f.@*chkf}}</label>
+    </template>
+  </div>
 
-	<div id='main'></div>
+  <div id='main'></div>
 
-	<script> /***** functions/callbacks *****************************************/
-		'use strict';
-		function csn(n) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
-		function eqTxt(eq) {
-			if (eq === 1) return 'local';
-			else if (eq > 1) return 'both';
-			else return 's3';
-		}
-		function actionTxt(eq) {
-			if (eq === -1) return '[v]';
-			else if (eq === 1) return '[^]';
-			else return '';
-		}
-		function qFilter(o, p, ctx, key, spath, qq) {
-			if (!o) return '';
-			var qtxt = qq('model.filter.q')
-				, clocal = qq('model.filter.local')
-				, cs3 = qq('model.filter.s3')
-				, cboth = qq('model.filter.both')
-				, inv = qq('model.filter.invert');
-			console.log('invert', inv);
-			var rx = new RegExp(qtxt, 'i');
-			var show = true;
-			if (!rx.test(o.key)) show &= false;
-			if (inv) show = !show;
-			if (!clocal && o.eq === 1) show &= false;
-			if (!cs3 && o.eq < 0) show &= false;
-			if (!cboth && o.eq > 1) show &= false;
-			o.uxShow = show;
-			return show ? '' : 'hide';
-		}
-		function actionClick(ctx, path, qq, event) {
-			var dir = parseInt(ctx._dir);
-			console.log(ctx._dir, dir, typeof dir);
-			var q = ctx.model.queue;
-			for (var i = 0; i < q.length; i++) {
-				var o = q[i];
-				if (o.uxShow) o.action = dir;
-			}
-			ctx.ist.recalc();
-		}
-		function dirClick(ctx, path, qq, event) {
-			var entry = qq('b');
-			data.queue.splice(0);
-			data.fcompl.splice(0);
-			data.complete = 'in progress';
-			data.timer.start = Date.now(); data.timer.end = null;
-			data.current = entry;
-			console.log('click', entry);
-			window.jsonWsHandler.sendJson(entry.name, entry);
-		}
-		function initiateSync() {
-			var q = tmp.model.queue.filter(x => x.uxShow && x.action);
-			window.jsonWsHandler.sendJson('actionQueue', q);
-		}
-		function fmtActive(dt0, p, ctx) {
-			if (!dt0) return '';
-			var ival = 500, ms = Date.now() - dt0, secs = Math.floor(ms / 1000),
-				len = Math.round((ms / ival) % 50);
-			setTimeout(function() { ctx.ist.recalc(); }, ival);
-			return secs + ('='.repeat(len)) + '>';
-		}
-	</script>
+  <script> /***** functions/callbacks *****************************************/
+    'use strict';
+    function csn(n) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    function eqTxt(eq) {
+      if (eq === 1) return 'local';
+      else if (eq > 1) return 'both';
+      else return 's3';
+    }
+    function actionTxt(eq) {
+      if (eq === -1) return '[v]';
+      else if (eq === 1) return '[^]';
+      else return '';
+    }
+    function qFilter(o, p, ctx, key, spath, qq) {
+      if (!o) return '';
+      var qtxt = qq('model.filter.q')
+        , clocal = qq('model.filter.local')
+        , cs3 = qq('model.filter.s3')
+        , cboth = qq('model.filter.both')
+        , inv = qq('model.filter.invert');
+      console.log('invert', inv);
+      var rx = new RegExp(qtxt, 'i');
+      var show = true;
+      if (!rx.test(o.key)) show &= false;
+      if (inv) show = !show;
+      if (!clocal && o.eq === 1) show &= false;
+      if (!cs3 && o.eq < 0) show &= false;
+      if (!cboth && o.eq > 1) show &= false;
+      o.uxShow = show;
+      return show ? '' : 'hide';
+    }
+    function actionClick(ctx, path, qq, event) {
+      var dir = parseInt(ctx._dir);
+      console.log(ctx._dir, dir, typeof dir);
+      var q = ctx.model.queue;
+      for (var i = 0; i < q.length; i++) {
+        var o = q[i];
+        if (o.uxShow) o.action = dir;
+      }
+      ctx.ist.recalc();
+    }
+    function dirClick(ctx, path, qq, event) {
+      var entry = qq('b');
+      data.queue.splice(0);
+      data.fcompl.splice(0);
+      data.complete = 'in progress';
+      data.timer.start = Date.now(); data.timer.end = null;
+      data.current = entry;
+      console.log('click', entry);
+      window.jsonWsHandler.sendJson(entry.name, entry);
+    }
+    function initiateSync() {
+      var q = tmp.model.queue.filter(x => x.uxShow && x.action);
+      window.jsonWsHandler.sendJson('actionQueue', q);
+    }
+    function fmtActive(dt0, p, ctx) {
+      if (!dt0) return '';
+      var ival = 500, ms = Date.now() - dt0, secs = Math.floor(ms / 1000),
+        len = Math.round((ms / ival) % 50);
+      setTimeout(function() { ctx.ist.recalc(); }, ival);
+      return secs + ('='.repeat(len)) + '>';
+    }
+  </script>
 
-	<script> /***** templar/data/context ****************************************/
-		'use strict';
-		var data = {
-			queue: [],
-			fcompl: [],
-			filter: { q: '', invert:false, local: true, s3: true, both: true },
-			timer: {}
-		};
-		var ctx = {
-			csn: csn,
-			eqTxt: eqTxt,
-			actionTxt: actionTxt,
-			qFilter: qFilter,
-			dirClick: dirClick,
-			actionClick: actionClick,
-			initiateSync: initiateSync,
-			fmtActive: fmtActive,
-			debug: 0
-		};
-		var tmp = new Templar('#main', '#root', data, ctx);
-		tmp.exec();
-	</script>
+  <script> /***** templar/data/context ****************************************/
+    'use strict';
+    var data = {
+      queue: [],
+      fcompl: [],
+      filter: { q: '', invert: false, local: true, s3: true, both: true },
+      timer: {}
+    };
+    var ctx = {
+      csn: csn,
+      eqTxt: eqTxt,
+      actionTxt: actionTxt,
+      qFilter: qFilter,
+      dirClick: dirClick,
+      actionClick: actionClick,
+      initiateSync: initiateSync,
+      fmtActive: fmtActive,
+      debug: 0
+    };
+    var tmp = new Templar('#main', '#root', data, ctx);
+    tmp.exec();
+  </script>
 
-	<script> /***** websockets **************************************************/
-		'use strict';
-		(function() {
-			var jh = window.jsonWsHandler;
+  <script> /***** websockets **************************************************/
+    'use strict';
+    (function() {
+      var jh = window.jsonWsHandler;
 
-			console.log('ws://' + window.location.host + '/');
-			var ws = new WebSocket('ws://' + window.location.host + '/');
-			ws.onopen = function() {
-				jh.addConn(ws);
-				ws.onmessage = jh.ondata;
-			};
-			ws.onclose = function() { jh.remConn(ws); };
-		})();
-	</script>
+      console.log('ws://' + window.location.host + '/');
+      var ws = new WebSocket('ws://' + window.location.host + '/');
+      ws.onopen = function() {
+        jh.addConn(ws);
+        ws.onmessage = jh.ondata;
+      };
+      ws.onclose = function() { jh.remConn(ws); };
+    })();
+  </script>
 
-	<script> /***** websocket handlers ******************************************/
-		window.jsonWsHandler
-			// .addCbJson(/.*/i, function (p, e) {
-			// 	console.log(e, p);
-			// })
-			.addCbJson('init', addHandlers);
+  <script> /***** websocket handlers ******************************************/
+    window.jsonWsHandler
+      // .addCbJson(/.*/i, function (p, e) {
+      // 	console.log(e, p);
+      // })
+      .addCbJson('init', addHandlers);
 
-		function addHandlers(obj) {
-			var ev = obj.events;
-			tmp.model.dirs = obj.dirs;
-			tmp.recalc();
-			window.jsonWsHandler
-				.addCbJson(ev.stats, function(s, e) {
-					tmp.model.stats = s;
-					tmp.recalc();
-				})
-				.addCbJson(ev.file_q, function(s, e) {
-					tmp.model.queue.push(s);
-					tmp.recalc();
-				})
-				.addCbJson(ev.get_remote, function(s, e) {
-					tmp.model.fetch = s;
-					tmp.recalc();
-				})
-				.addCbJson(ev.file_unused, function(s, e) {
-					Array.prototype.push.apply(tmp.model.queue, s.files);
-					tmp.recalc();
-				})
-				.addCbJson(ev.file_start, function(s, e) {
-					var i = tmp.model.queue.findIndex(x => x.key == s.key);
-					if (1 < 0) tmp.model.queue.push(s);
-					else Object.assign(tmp.model.queue[i], s);
-					tmp.recalc();
-				})
-				.addCbJson(ev.file_end, function(s, e) {
-					var i = tmp.model.queue.findIndex(x => x.key == s.key);
-					if (1 >= 0) tmp.model.queue.splice(i, 1);
-					delete s.dt0;
-					tmp.model.fcompl.push(s);
-					tmp.recalc();
-				})
-				.addCbJson(ev.end, function(s, e) {
-					tmp.model.complete = 'scan complete';
-					console.log(s);
-					tmp.model.timer.start = s.dt0;
-					tmp.model.timer.end = s.dt1;
-					tmp.recalc();
-				});
-		}
+    function addHandlers(obj) {
+      var ev = obj.events;
+      tmp.model.dirs = obj.dirs;
+      tmp.recalc();
+      window.jsonWsHandler
+        .addCbJson(ev.stats, function(s, e) {
+          tmp.model.stats = s;
+          tmp.recalc();
+        })
+        .addCbJson(ev.file_q, function(s, e) {
+          tmp.model.queue.push(s);
+          tmp.recalc();
+        })
+        .addCbJson(ev.get_remote, function(s, e) {
+          tmp.model.fetch = s;
+          tmp.recalc();
+        })
+        .addCbJson(ev.file_unused, function(s, e) {
+          Array.prototype.push.apply(tmp.model.queue, s.files);
+          tmp.recalc();
+        })
+        .addCbJson(ev.file_start, function(s, e) {
+          var i = tmp.model.queue.findIndex(x => x.key == s.key);
+          if (1 < 0) tmp.model.queue.push(s);
+          else Object.assign(tmp.model.queue[i], s);
+          tmp.recalc();
+        })
+        .addCbJson(ev.file_end, function(s, e) {
+          var i = tmp.model.queue.findIndex(x => x.key == s.key);
+          if (1 >= 0) tmp.model.queue.splice(i, 1);
+          delete s.dt0;
+          tmp.model.fcompl.push(s);
+          tmp.recalc();
+        })
+        .addCbJson(ev.end, function(s, e) {
+          tmp.model.complete = 'scan complete';
+          console.log(s);
+          tmp.model.timer.start = s.dt0;
+          tmp.model.timer.end = s.dt1;
+          tmp.recalc();
+        });
+    }
 
-		/* TODO:
+    /* TODO:
 
-		templar
-			- change domMon.recalcPat
-		*/
-	</script>
+    templar
+      - change domMon.recalcPat
+    */
+  </script>
 </body>
 
 </html>

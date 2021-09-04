@@ -5,48 +5,64 @@ const web = require('template.das');
 const flag = x => ~process.argv.indexOf('-' + x);
 const filters = [/\bnode_modules\b/, /^data$/, /~$/, /\.swp$/,
   /^node.cp.cpdata$/, /^node.cp.enc/,
-  /^node.temp/, /^node.das.breviarium.divinum-officium/];
+  /^node.temp/,
+  /^node.doc-offline.out/,
+  /^node.doc-offline.queue/,
+  /^node.das.brev_etc.divinum-officium/,
+  /^node.das.brev_etc.jgabc/,
+  /\.next\b/,
+  /android.app.build/,
+  /^root.br.h/,
+  /^root.texdown.node.epub-out/,
+  /^(dotnet|node|test)\/.*\/(bin|obj)\//,
+  /android\/app\/build/,
+  /The Talmud Unmasked english parallel\/p\//,
+];
 const sync = (s, d) => s3.sync(s, d, filters);
 const dirs = [
   {
     c: 't1',
     name: 'temp1: Pious Reflections',
-    args: ['/home/user/0das/1/Alphonsianum/Pious Reflections/', 'das-junk']
+    args: ['/home/user/0das/1/Alphonsianum/Pious Reflections/', 'das-junk'],
   }, {
     c: 't2',
     name: 'temp2: Preparation for Death',
-    args: ['/home/user/0das/1/Alphonsianum/Preparation for Death/', 'das-junk']
+    args: ['/home/user/0das/1/Alphonsianum/Preparation for Death/', 'das-junk'],
   }, {
     c: 't3',
     name: 'temp3: Gildersleeve',
-    args: ['/home/user/0das/pdf/Latin/Gildersleeve/', 'das-junk']
+    args: ['/home/user/0das/pdf/Latin/Gildersleeve/', 'das-junk'],
   }, {
     c: 't4',
     name: 'temp4: dictionaries',
-    args: ['/home/user/0das/pdf/Latin/dictionaries/', 'das-junk']
+    args: ['/home/user/0das/pdf/Latin/dictionaries/', 'das-junk'],
   }, {
     c: 't5',
     name: 'super temp',
-    args: ['/home/user/0das/temp/das-junk/', 'das-junk']
+    args: ['/home/user/0das/temp/das-junk/', 'das-junk'],
   }, {
     c: '1',
     name: 'archive: ~/0das/1/',
-    args: ['/home/user/0das/1/', 'das-1-docs']
+    args: ['/home/user/0das/1/', 'das-1-docs'],
   }, {
     c: 'p',
     name: 'archive: ~/0das/pdf/',
-    args: ['/home/user/0das/pdf/', 'das-pdf']
+    args: ['/home/user/0das/pdf/', 'das-pdf'],
   }, {
     c: 'w',
     name: 'archive: ~/www/',
-    args: ['/home/user/www/', 'das-www']
+    args: ['/home/user/www/', 'das-www'],
   }, {
     c: 'z',
     name: 'archive: ~/0das/zprogs/',
-    args: ['/home/user/0das/zprogs/', 'das-zprogs']
-  }
+    args: ['/home/user/0das/zprogs/', 'das-zprogs'],
+  }, {
+    c: 'f',
+    name: 'archive: ~/Videos/fssr/',
+    args: ['/home/user/Videos/fssr/', 'das-fssr'],
+  },
 ];
-let srv, gchrome;
+let srv, browser;
 
 async function main() {
   let fn = () => console.log('choose action: u/d/s');
@@ -66,14 +82,15 @@ async function main() {
       .start();
     // or xdg-open?
     if (flag('g')) {
-      gchrome = exec(`google-chrome --app=http://${srv.host}:${srv.port}/ux.html`);
-      gchrome.stdout.pipe(process.stdout);
-      gchrome.stderr.pipe(process.stderr);
+      // browser = exec(`google-chrome --app=http://${srv.host}:${srv.port}/preact.html`);
+      browser = exec(`firefox --new-window http://${srv.host}:${srv.port}/preact.html`);
+      browser.stdout.pipe(process.stdout);
+      browser.stderr.pipe(process.stderr);
     }
     s3Socket(srv);
   }
 
-  for (let d of dirs) {
+  for (const d of dirs) {
     if (flag(d.c)) {
       console.log('starting ', d.name);
       await fn.apply(null, d.args);
@@ -100,7 +117,7 @@ function s3Socket(srv) {
       s3.actionQueue(p, true));
 
   let inProgress = false;
-  for (var d of dirs) {
+  for (const d of dirs) {
     srv.jh.addCbJson(d.name, async o => {
       if (inProgress) console.log('*** reject, another sync is in progress', d.name);
       inProgress = true;
