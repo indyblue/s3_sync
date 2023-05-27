@@ -112,7 +112,7 @@ async function s3Equal(lstat, s3map) {
 async function sync(path, bucket, filters) {
   statReset();
   const dt0 = Date.now();
-  const s3config = { bucket: bucket, dry: false };
+  const s3config = { bucket, dry: false };
 
   s3config.map = await getRemote(s3config.bucket, path);
 
@@ -127,8 +127,8 @@ async function sync(path, bucket, filters) {
       }
       emitter.emit(ev.file_all, s);
       s.bucket = bucket;
-      const pr = s3Equal(s, s3config.map).then(status => {
-        if (status === 0) emitter.emit(ev.file_eq, s);
+      const pr = s3Equal(s, s3config.map).then(st => {
+        if (st === 0) emitter.emit(ev.file_eq, s);
         else emitter.emit(ev.file_q, s);
       });
       aprs.push(pr);
@@ -239,7 +239,7 @@ function consoleEmitters() {
 
 /******************************************************************************/
 let finishQueue = null;
-function simpleS3Queue() {
+function simpleS3Queue(limit) {
   let upcnt = 0; const queue = []; let compDone = false;
   const handleQ = s => {
     if (s) queue.push(s);
@@ -263,6 +263,7 @@ function simpleS3Queue() {
       await Promise.all(qprs);
     };
 
+    if (limit) return true;
     const dels = unused;
     while (dels.length) {
       const dbatch = dels.splice(0, 40);
@@ -398,7 +399,7 @@ async function getVersions(bucket) {
 
 async function status(path, bucket) {
   const dt0 = Date.now();
-  const s3config = { bucket: bucket, dry: false };
+  const s3config = { bucket, dry: false };
 
   s3config.map = await getVersions(s3config.bucket);
   const multi = Array.from(s3config.map.values()).filter(x => x.objs.length > 1);

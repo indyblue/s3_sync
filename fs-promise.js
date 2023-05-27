@@ -37,6 +37,17 @@ const fs = {
   createWriteStream: fso.createWriteStream,
   unlinkSync: fso.unlinkSync,
   ensureFileSync,
+  safeReadObj: async (x, d = {}, f = 'utf8') => {
+    try {
+      const txt = await fso.promises.readFile(x, f);
+      return JSON.parse(txt);
+    } catch { }
+    return d;
+  },
+  writeFileObj: async (x, c, f = 'utf8') => {
+    if (typeof c !== 'string') c = JSON.stringify(c);
+    await fso.promises.writeFile(x, c, f);
+  }
 };
 
 module.exports = fs;

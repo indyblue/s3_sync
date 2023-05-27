@@ -11,7 +11,7 @@
   <script type="text/javascript" src='/tmp/templar.js'></script>
   <script type="text/javascript"
     src='/tmp/json_websocket.js'></script>
-  <link href="/styles.css" rel="stylesheet">
+  <link href="etc/styles.css" rel="stylesheet">
   <style>
   </style>
 </head>
@@ -95,7 +95,8 @@
       </s></template>
 
     <template id='queue'>
-      <fr x-model-q' class="{{q.eq.*eqTxt}} {{q.*qFilter}}">
+      <fr x-model-q' class="{{q.eq.*eqTxt}} {{q.*qFilter}}"
+        on-click="{{lineClick}}">
         <fs>{{q.action.*actionTxt}} &nbsp;</fs>
         <fg><span>{{q.key}}</span>
           <div>{{q.dt0.*fmtActive}}</div>
@@ -109,7 +110,7 @@
     <template id='filter-checkbox'>
       <input type='checkbox' checked='{{f.*chkf}}'
         id='chf-{{f.@*chkf}}'
-        on-click="{?{ qq('f.*chkf', this.checked); ctx.ist.recalc(); }}" />
+        on-click="{{ qq('f.*chkf', this.checked); ctx.ist.recalc(); }}" />
       <label for='chf-{{f.@*chkf}}'>{{f.@*chkf}}</label>
     </template>
   </div>
@@ -157,6 +158,13 @@
       }
       ctx.ist.recalc();
     }
+    function lineClick(ctx, path, qq, event) {
+      var o = qq('q');
+      if(!o.action) o.action = 1;
+      else if (o.action > 0) o.action = -1;
+      else o.action = 0;
+      ctx.ist.recalc();
+    }
     function dirClick(ctx, path, qq, event) {
       var entry = qq('b');
       data.queue.splice(0);
@@ -195,6 +203,7 @@
       qFilter: qFilter,
       dirClick: dirClick,
       actionClick: actionClick,
+      lineClick,
       initiateSync: initiateSync,
       fmtActive: fmtActive,
       debug: 0

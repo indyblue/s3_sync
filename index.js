@@ -2,8 +2,15 @@
 const s3 = require('./s3-sync');
 const { exec } = require('child_process');
 const web = require('template.das');
-const flag = x => ~process.argv.indexOf('-' + x);
-const filters = [/\bnode_modules\b/, /^data$/, /~$/, /\.swp$/,
+const flag = (x, p = '') => {
+  if (x instanceof RegExp) return process.argv.find(a => x.test(a));
+  return ~process.argv.indexOf('-' + p + x);
+};
+const filters = [
+  /emr_casepacer_deploy.bak.gz/,
+  /\bnode_modules\b/,
+  /\.yarn\/cache\b/,
+  /^data$/, /~$/, /\.swp$/,
   /^node.cp.cpdata$/, /^node.cp.enc/,
   /^node.temp/,
   /^node.doc-offline.out/,
@@ -17,6 +24,16 @@ const filters = [/\bnode_modules\b/, /^data$/, /~$/, /\.swp$/,
   /^(dotnet|node|test)\/.*\/(bin|obj)\//,
   /android\/app\/build/,
   /The Talmud Unmasked english parallel\/p\//,
+  /2_casepacer/,
+  /caldav.collection-root/,
+  /^quickjs.quickjs.lib.*\.a$/,
+  /^quickjs.(ssimple|dbg.ssimple.s|mvp)/,
+  /^quickjs.quickjs.(qjsc?|libquickjs.a|run-test262$)$/,
+  /^quickjs.quickjs.(examples|\.obj|\.git)/,
+  /tex-latex\/gtemp\//,
+  /Barrister\/logs\//,
+  /Barrister.ClientApp.build\//,
+  /schedule_calendar.TradCal.caldav./,
 ];
 const sync = (s, d) => s3.sync(s, d, filters);
 const dirs = [
@@ -67,10 +84,16 @@ let srv, browser;
 async function main() {
   let fn = () => console.log('choose action: u/d/s');
   let fnDone = () => { };
-  if (flag('u')) {
+  let limit = 0;
+  if (flag('0')) {
+    console.log('limited bandwidth mode...');
+    filters.push(/^node.cp/);
+    limit = 1;
+  }
+  if (flag(/^-u/)) {
     s3.consoleEmitters();
     fn = sync;
-    s3.simpleS3Queue();
+    s3.simpleS3Queue(limit);
     fnDone = () => { process.exit(); };
   } else if (flag('d')) fn = s3.download;
   else if (flag('s')) fn = s3.status;
@@ -78,12 +101,12 @@ async function main() {
     srv = web.new({ port: 14032 });
     await srv
       .addHandler(/tmp\/(.*)/, web.modFiles(1))
-      .addHandler(true, web.files)
+      .addHandler(true, web.custFiles('public'))
       .start();
     // or xdg-open?
     if (flag('g')) {
-      // browser = exec(`google-chrome --app=http://${srv.host}:${srv.port}/preact.html`);
-      browser = exec(`firefox --new-window http://${srv.host}:${srv.port}/preact.html`);
+      browser = exec(`chromium --new-window http://${srv.host}:${srv.port}/ux.html`);
+      // browser = exec(`firefox --new-window http://${srv.host}:${srv.port}/preact.html`);
       browser.stdout.pipe(process.stdout);
       browser.stderr.pipe(process.stderr);
     }
@@ -91,7 +114,7 @@ async function main() {
   }
 
   for (const d of dirs) {
-    if (flag(d.c)) {
+    if (flag(d.c, 'u')) {
       console.log('starting ', d.name);
       await fn.apply(null, d.args);
     }
