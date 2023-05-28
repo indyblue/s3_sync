@@ -34,6 +34,7 @@ const filters = [
   /Barrister\/logs\//,
   /Barrister.ClientApp.build\//,
   /schedule_calendar.TradCal.caldav./,
+  /^node.das.s3_sync.cache/,
 ];
 const sync = (s, d) => s3.sync(s, d, filters);
 const dirs = [

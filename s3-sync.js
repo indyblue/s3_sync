@@ -9,6 +9,7 @@ const s3v3 = new S3v3({ region: 'us-east-2' });
 const $path = require('path');
 const pj = $path.join;
 const fs = require('./fs-promise');
+const { psb } = require('./etag');
 const EventEmitter = require('events');
 const emitter = new EventEmitter();
 const ev = {
@@ -29,7 +30,6 @@ const ev = {
   stats: 'stats',
 };
 const sleep = ms => new Promise(res => setTimeout(res, ms));
-const psmb = 8;
 const logger = {
   log: console.log,
   write: x => { process.stdout.write(x); },
@@ -41,22 +41,31 @@ const logger = {
 // comma separated number
 const csn = n => n?.toString()?.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
-// file filter check - string(contains), regexp(test), function(return true)
-const chkFilter = (stat, filters) => {
-  if (!filters || !Array.isArray(filters)) return false;
-  for (const f of filters) {
-    if (f instanceof RegExp && f.test(stat.key)) return true;
-    else if (typeof f === 'string' && stat.key.indexOf(f) >= 0) return true;
-    else if (typeof f === 'function' && f(stat.key) === true) return true;
-  }
-  return false;
-};
-
 async function getRemote(bucket, lpath) {
   logger.write(`loading ${bucket}:`);
+
+  const cpath = `cache/${bucket}.json`;
+  const cfiles = await fs.safeReadObj(cpath);
+  const ckeys = Object.keys(cfiles).sort();
+  const ci = 5;
+  const cint = Math.max(Math.floor(ckeys.length / ci), 900);
+  const seeds = ckeys.filter((_, i) => i && i % cint === 0);
+  seeds.unshift(null);
+
   const files = new Map();
-  function addR(arr) {
+  function addR(arr, si) {
+    if (!arr?.length) {
+      return true;
+    }
+    let end = false;
+    let i = 0;
+    const nseed = seeds[si + 1];
     for (const q of arr) {
+      if ((nseed && q.Key > nseed)
+        || files.has(q.Key)) {
+        end = true;
+        break;
+      }
       // if (/-/.test(q.ETag)) logger.log(q.Key, q.Size, q.ETag);
       files.set(q.Key, {
         key: q.Key,
@@ -67,35 +76,33 @@ async function getRemote(bucket, lpath) {
         isS3: true,
         eq: -1,
       });
+      i++;
     }
     emitter.emit(ev.get_remote, { length: files.size, done: false });
+    return end;
   }
-  let resp;
-  do {
-    resp = await s3v3.listObjectsV2({
-      Bucket: bucket,
-      ContinuationToken: resp?.NextContinuationToken,
-    });
-    addR(resp.Contents);
-    logger.write('.');
-  } while (resp.NextContinuationToken);
+  console.time('files');
+  console.log(seeds);
+  const prs = seeds.map(async (x, i) => {
+    let resp;
+    do {
+      const ContinuationToken = resp?.NextContinuationToken;
+      const StartAfter = x && !ContinuationToken ? x : undefined;
+      resp = await s3v3.listObjectsV2({
+        Bucket: bucket,
+        StartAfter,
+        ContinuationToken,
+      });
+      if (addR(resp.Contents, i)) break;
+      logger.write('.');
+    } while (resp.NextContinuationToken);
+  });
+  await Promise.all(prs);
 
-  /*
-  const objs = await s3.listObjects({
-    Bucket: bucket,
-    MaxKeys: 1000,
-  }).promise();
-  let np = objs;
-  addR(np.Contents);
-  logger.write('.');
-  while (np.$response.hasNextPage()) {
-    np = await np.$response.nextPage().promise();
-    addR(np.Contents);
-    logger.write('.');
-  }
-  */
   logger.write('done\n');
+  await fs.writeFileObj(cpath, files);
   emitter.emit(ev.get_remote, { length: files.size, done: true });
+  console.timeEnd('files');
   return files;
 }
 
@@ -105,7 +112,7 @@ async function s3Equal(lstat, s3map) {
   rstat.used = true;
   lstat.s3 = rstat;
   if (lstat.size !== rstat.size) { return lstat.eq = 2; }
-  const letag = await lstat.etag(psmb);
+  const letag = await lstat.etag();
   if (letag !== rstat.etag) { return lstat.eq = 3; } else return lstat.eq = 0;
 }
 
@@ -116,26 +123,24 @@ async function sync(path, bucket, filters) {
 
   s3config.map = await getRemote(s3config.bucket, path);
 
-  const aprs = [];
   emitter.emit(ev.progress, { status: 'start', path });
-  const objs = await fs.deepstats('', path, stats => {
+  const objs = await fs.deepstats('', path, filters, async stats => {
+    const rv = [];
     for (const s of stats) {
-      if (s.isDir || !s.isFile || s.size === 0
-        || chkFilter(s, filters)) {
-        emitter.emit(ev.file_skip, s);
+      if (s.isDir || !s.isFile || s.size === 0) {
+        // emitter.emit(ev.file_skip, s);
         continue;
       }
+      rv.push(s);
       emitter.emit(ev.file_all, s);
       s.bucket = bucket;
-      const pr = s3Equal(s, s3config.map).then(st => {
-        if (st === 0) emitter.emit(ev.file_eq, s);
-        else emitter.emit(ev.file_q, s);
-      });
-      aprs.push(pr);
+      const st = await s3Equal(s, s3config.map);
+      if (st === 0) emitter.emit(ev.file_eq, s);
+      else emitter.emit(ev.file_q, s);
     }
+    return rv;
   });
   emitter.emit(ev.file_list_done, path);
-  await Promise.all(aprs);
   emitter.emit(ev.file_comp_done, path);
 
   const unused = Array.from(s3config.map.values()).filter(x => !x.used);
@@ -284,7 +289,7 @@ const s3Upload = stat => {
     Bucket: stat.bucket,
     Key: stat.key,
     Body: fs.createReadStream(stat.path),
-  }, { partSize: psmb * 1024 * 1024 });
+  }, { partSize: psb });
   const pr = s3up.promise().then(x => {
     emitter.emit(ev.file_end, stat);
   });

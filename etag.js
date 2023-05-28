@@ -1,15 +1,16 @@
 /* eslint-disable no-unused-vars */
 const crypto = require('crypto');
 const fs = require('fs');
-
-const etag = (fname, psmb) => new Promise((resolve, reject) => {
+const psmb = 8;
+const psb = 8 * 1024 * 1024;
+const etag = fname => new Promise((resolve, reject) => {
   const dt0 = Date.now();
-  const ps = (psmb || 8) * 1024 * 1024; const hashes = []; let pos = 0; let chunk;
+  const hashes = []; let pos = 0; let chunk;
   let hash = crypto.createHash('md5');
   const rs = fs.createReadStream(fname);
 
   rs.on('data', x => {
-    let tail = null; const rnd = ps - (pos % ps); const len = x.length;
+    let tail = null; const rnd = psb - (pos % psb); const len = x.length;
     if (rnd <= len) {
       tail = x.slice(rnd);
       x = x.slice(0, rnd);
@@ -31,7 +32,7 @@ const etag = (fname, psmb) => new Promise((resolve, reject) => {
     if (hashes.length === 1) return resolve(hashes[0]);
 
     let final = crypto.createHash('md5');
-    hashes.map(x => final.update(Buffer.from(x, 'hex')));
+    hashes.map(x2 => final.update(Buffer.from(x2, 'hex')));
     final = final.digest('hex') + '-' + hashes.length;
     // let ref = '8421d09ee84c4de6ddfc27d1c795d5f4-5'
     // console.log(final, ref === final);
@@ -39,5 +40,8 @@ const etag = (fname, psmb) => new Promise((resolve, reject) => {
     resolve(final);
   });
 });
+
+etag.psmb = psmb;
+etag.psb = psb;
 
 module.exports = etag;
